@@ -1,0 +1,58 @@
+swagger: "2.0"
+
+info:
+  title: "Music Database Server"
+  version: "1.0"
+#  license:
+#    name: Apache 2.0
+#    url: http://www.apache.org/licenses/LICENSE-2.0.html
+
+
+schemes:
+ - http
+paths:
+  /songs/get_song/:
+      get:
+        summary: 'Fetch random song from the favorites database'
+        parameters:
+        - in: query
+          name: quantity
+          type: integer
+          required: false
+          description: Number of favorite songs to get. If not indicated it will return 1 song (if there is at least one song matching the score criteria).
+        - in: query
+          name: score
+          type: integer
+          required: false
+          description: Minimum score of the favorite songs to get. If not indicated minimum is 0.
+        tags:
+        - public
+        operationId: api.songs.get_song
+        responses:
+          '200':
+              description: 'Fetch (a) random song(s) from the favorites database'
+              schema:
+                 type: array
+                 items:
+                 $ref: '#/definitions/song'            
+                
+                
+#tags are used for organizing operations
+tags:
+- name: public
+  description: Operations available to regular developers
+- name: admins
+  description: Secured Admin-only calls
+
+definitions:
+  song:
+    type: object
+    properties:
+      _id:          { type: string }
+      title:        { type: string }
+      album:        { type: string }
+      band:         { type: string }
+      total_length: { type: string }
+      abs_path:     { type: string }
+      score:        { type: string }
+        
