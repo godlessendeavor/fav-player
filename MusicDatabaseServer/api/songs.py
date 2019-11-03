@@ -8,5 +8,17 @@ from providers.DatabaseProvider import DatabaseProvider
 
 
 @inject
-def get_song(data_provider=DatabaseProvider, quantity = 1, score = 0.0) -> str:
-    return data_provider().get_song(quantity, score)
+def get_songs(data_provider=DatabaseProvider, quantity = 1, score = 0.0) -> str:
+    return data_provider().get_songs(quantity, score)
+
+@inject
+def create_song(data_provider=DatabaseProvider, song = None):
+    return data_provider().create_song(song)
+
+@inject
+def update_song(data_provider=DatabaseProvider, song = None):
+    return data_provider().update_song(song)
+
+@inject
+def delete_song(data_provider=DatabaseProvider, song_id = None):
+    return data_provider().delete_song(song_id)

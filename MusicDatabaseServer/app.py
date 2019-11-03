@@ -22,7 +22,8 @@ if __name__ == '__main__':
     app.add_api(
         'app_definition.yaml', 
         resolver  = RestyResolver('api'),
-        arguments = {'title': 'DatabaseServer'})
+        arguments = {'title': 'DatabaseServer'},
+        strict_validation=True)
     FlaskInjector(app=app.app, modules=[configure])
-    app.run(port=2020, debug=True) # os.environ is handy if you intend to launch on heroku
+    app.run(port=2020, debug=True)
     

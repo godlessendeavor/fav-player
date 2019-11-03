@@ -11,7 +11,7 @@ info:
 schemes:
  - http
 paths:
-  /songs/get_song/:
+  /songs/fav_song: #make sure to not leave trailing slashes in the path or Flask will redirect the response to the URL with trailing slash 
       get:
         summary: 'Fetch random song from the favorites database'
         parameters:
@@ -27,22 +27,76 @@ paths:
           description: Minimum score of the favorite songs to get. If not indicated minimum is 0.
         tags:
         - public
-        operationId: api.songs.get_song
+        operationId: api.songs.get_songs
         responses:
           '200':
-              description: 'Fetch (a) random song(s) from the favorites database'
+              description: Fetch (a) random song(s) from the favorites database
               schema:
                  type: array
                  items:
-                 $ref: '#/definitions/song'            
+                 $ref: '#/definitions/song'   
+      post:
+         summary: Creates a new favorite song.
+         consumes:
+           - application/json
+         parameters:
+           - in: body
+             name: song
+             description: The song to create.
+             required: true
+             schema:
+               $ref: '#/definitions/song'
+         tags:
+           - public
+         operationId: api.songs.create_song
+         responses:
+           '200':
+              description: OK           
+                 
+      put:
+         summary: Updates a favorite song.
+         consumes:
+           - application/json
+         parameters:
+           - in: body
+             name: song
+             description: The song to update.
+             required: true
+             schema:
+               $ref: '#/definitions/song'
+         tags:
+           - public
+         operationId: api.songs.update_song
+         responses:
+           '200':
+              description: OK    
+              
+      delete:
+         summary: Deletes a favorite song.
+         consumes:
+           - application/json
+         parameters:
+           - in: query
+             name: song_id
+             type: integer             
+             required: true
+             description: The song id to delete.
+         tags:
+           - public
+         operationId: api.songs.delete_song
+         responses:
+           '200':
+              description: OK 
+              
+          
+
                 
                 
-#tags are used for organizing operations
 tags:
 - name: public
   description: Operations available to regular developers
-- name: admins
-  description: Secured Admin-only calls
+#- name: admins
+#  description: Secured Admin-only calls
 
 definitions:
   song:
@@ -54,5 +108,14 @@ definitions:
       band:         { type: string }
       total_length: { type: string }
       abs_path:     { type: string }
+      track_number: { type: string }
       score:        { type: string }
+    required:
+      - title
+      - album
+      - band
+      - total_length
+      - abs_path
+      - track_number
+      - score
         
