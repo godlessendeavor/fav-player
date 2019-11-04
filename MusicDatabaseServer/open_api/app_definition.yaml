@@ -103,19 +103,14 @@ definitions:
     type: object
     properties:
       _id:          { type: string }
+      disc_id:      { type: string }
       title:        { type: string }
-      album:        { type: string }
-      band:         { type: string }
-      total_length: { type: string }
-      abs_path:     { type: string }
       track_number: { type: string }
       score:        { type: string }
+      type:         { type: string }
     required:
+      - disc_id
       - title
-      - album
-      - band
-      - total_length
-      - abs_path
       - track_number
       - score
         
