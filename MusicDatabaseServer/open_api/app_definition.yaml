@@ -10,8 +10,80 @@ info:
 
 schemes:
  - http
-paths:
-  /songs/fav_song: #make sure to not leave trailing slashes in the path or Flask will redirect the response to the URL with trailing slash 
+paths:             
+  /music/album: #make sure to not leave trailing slashes in the path or Flask will redirect the response to the URL with trailing slash 
+      get:
+        summary: 'Fetch albums from the music database'
+        parameters:
+        - in: query
+          name: quantity
+          type: integer
+          required: false
+          description: Number of albums to get. If not indicated it will return all albums.
+        tags:
+        - public
+        operationId: api.albums.get_albums
+        responses:
+          '200':
+              description: Fetch album(s) from the music database
+              schema:
+                 type: array
+                 items:
+                 $ref: '#/definitions/album'   
+      post:
+         summary: Creates a new album.
+         consumes:
+           - application/json
+         parameters:
+           - in: body
+             name: album
+             description: The album to create.
+             required: true
+             schema:
+               $ref: '#/definitions/album'
+         tags:
+           - public
+         operationId: api.albums.create_album
+         responses:
+           '200':
+              description: OK           
+                 
+      put:
+         summary: Updates an album.
+         consumes:
+           - application/json
+         parameters:
+           - in: body
+             name: album
+             description: The album to update.
+             required: true
+             schema:
+               $ref: '#/definitions/album'
+         tags:
+           - public
+         operationId: api.albums.update_album
+         responses:
+           '200':
+              description: OK    
+              
+      delete:
+         summary: Deletes an album.
+         consumes:
+           - application/json
+         parameters:
+           - in: query
+             name: album_id
+             type: integer             
+             required: true
+             description: The album id to delete.
+         tags:
+           - public
+         operationId: api.albums.delete_album
+         responses:
+           '200':
+              description: OK     
+              
+  /music/fav_song: #make sure to not leave trailing slashes in the path or Flask will redirect the response to the URL with trailing slash 
       get:
         summary: 'Fetch random song from the favorites database'
         parameters:
@@ -86,9 +158,7 @@ paths:
          operationId: api.songs.delete_song
          responses:
            '200':
-              description: OK 
-              
-          
+              description: OK       
 
                 
                 
@@ -99,18 +169,47 @@ tags:
 #  description: Secured Admin-only calls
 
 definitions:
+  album:
+    type: object
+    properties:
+      _id:          { type: string }
+      band:         { type: string }
+      title:        { type: string }
+      style:        { type: string }
+      year:         { type: string }
+      country:      { type: string }
+      path:         { type: string }
+      type:         { type: string }
+      score:        { type: string }
+      review:       { type: string }
+    required:
+      - band
+      - title
+      - year
+      - path
+      
   song:
     type: object
     properties:
       _id:          { type: string }
       disc_id:      { type: string }
       title:        { type: string }
+      file_name:    { type: string }
       track_number: { type: string }
       score:        { type: string }
       type:         { type: string }
     required:
       - disc_id
       - title
+      - file_name
       - track_number
       - score
-        
+      
+
+
+      
+      
+      
+      
+      
+             

@@ -6,6 +6,11 @@ song = {
         "disc_id":"13456"
         }
 
+album = {
+         "_id":"234589",
+         "band":"Slayer",
+                 }
+
 
 class DatabaseProvider(object):
     
@@ -22,6 +27,21 @@ class DatabaseProvider(object):
     
     def delete_song(self, song_id) ->str:
         print(song_id)
+        return 200
+    
+    def get_albums(self, quantity) -> str:
+        return album,200
+    
+    def create_album(self, album) ->str:
+        print(album)
+        return 200
+    
+    def update_album(self, album) ->str:
+        print(album)
+        return 200
+    
+    def delete_album(self, album_id) ->str:
+        print(album_id)
         return 200
     
     
