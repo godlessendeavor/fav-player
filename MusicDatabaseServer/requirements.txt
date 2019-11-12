@@ -3,3 +3,5 @@ connexion
 connexion[swagger-ui]
 Flask-Injector
 injector==0.17.0
+pymysql
+peewee
