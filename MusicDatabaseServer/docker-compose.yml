@@ -1,4 +1,4 @@
-version: "3"
+version: "3.1"
 services:
   web:
     image: musicdbserver
@@ -12,7 +12,39 @@ services:
         condition: on-failure
     ports:
       - "2020:2020"
+    depends_on:
+      - musicdb
+    #volume bound to path in the host 
+    #TODO: create another container with config in a volume that all other containers can read    
+    volumes:
+      - /home/thrasher/apps_config/musicdb:/config
     networks:
       - webnet
+      
+  musicdb:
+     image: mysql:8.0.17
+     command: --default-authentication-plugin=mysql_native_password
+     environment:
+       MYSQL_DATABASE: 'music'
+       MYSQL_USER: 'root'
+#      Password for root access
+       MYSQL_ROOT_PASSWORD: 'nevermore'
+       port: 3306
+#    Volumes where our data will be persisted
+     volumes:
+       - mysqldb:/var/lib/mysql
+     networks:
+      - webnet
+     
+# 
+#   dbadmin:    
+#     image: adminer    
+#     ports:      
+#       - "8181:8080"
 networks:
-  webnet:
+  webnet:  
+
+volumes:
+  mysqldb:
+  musicdbserver_config:
+  

@@ -5,7 +5,7 @@ import json
 
 
 import logging
-from _cffi_backend import typeof
+
 logging.basicConfig(
     format='[%(asctime)-15s] [%(name)s] %(levelname)s]: %(message)s',
     level=logging.DEBUG
@@ -27,7 +27,7 @@ album = {
 
 database = MySQLDatabase('music', 
                          **{'charset': 'utf8', 
-                            'sql_mode': 'PIPES_AS_CONCAT,NO_AUTO_CREATE_USER', 
+                            'sql_mode': 'PIPES_AS_CONCAT', 
                             'use_unicode': True, 
                             'host': config.DATABASE_HOST, 
                             'port': config.DATABASE_PORT, 

@@ -15,7 +15,7 @@ import json
 
 # first load config from a json file,
 #appconf = json.load(open(os.environ["MUSICDB_CONFIG_PATH"]))
-appconf = json.load(open('/home/thrasher/musicdb.conf'))
+appconf = json.load(open('/config/musicdb.conf'))
 
 # database config
 DATABASE_HOST = appconf['music_db']['DATABASE_HOST']
