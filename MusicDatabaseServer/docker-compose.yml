@@ -14,10 +14,11 @@ services:
       - "2020:2020"
     depends_on:
       - musicdb
-    #volume bound to path in the host 
-    #TODO: create another container with config in a volume that all other containers can read    
+    env_file:
+      - musicdb.env
+    #volume bound to path in the host   
     volumes:
-      - /home/thrasher/apps_config/musicdb:/config
+      - ${MUSIC_DB_CONFIG_VOL}:/config
     networks:
       - webnet
       
@@ -46,5 +47,4 @@ networks:
 
 volumes:
   mysqldb:
-  musicdbserver_config:
   

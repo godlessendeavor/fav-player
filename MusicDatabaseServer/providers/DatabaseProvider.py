@@ -11,19 +11,6 @@ logging.basicConfig(
     level=logging.DEBUG
 )
 
-song = {
-        "_id":"123",
-        "title": "Northern Chaos gods",
-        "score":"7.5",
-        "disc_id":"13456"
-        }
-
-album = {
-         "_id":"234589",
-         "band":"Slayer",
-                 }
-
-
 
 database = MySQLDatabase('music', 
                          **{'charset': 'utf8', 
@@ -39,7 +26,7 @@ class BaseModel(Model):
     class Meta:
         database = database
         
-class Music(BaseModel):
+class Album(BaseModel):
     id = AutoField(column_name='Id')
     copy = CharField(constraints=[SQL("DEFAULT ' '")])
     group_name = CharField(column_name='groupName', constraints=[SQL("DEFAULT ' '")])
@@ -56,7 +43,7 @@ class Music(BaseModel):
 
 class Favorites(BaseModel):
     id = AutoField(column_name='Id')
-    disc_id = ForeignKeyField(Music, backref='favorites')
+    disc_id = ForeignKeyField(Album, backref='favorites')
     score = FloatField(constraints=[SQL("DEFAULT 0")])
     track_no = IntegerField(constraints=[SQL("DEFAULT 0")])
     track_title = CharField()
@@ -66,11 +53,10 @@ class Favorites(BaseModel):
         table_name = 'favorites'
 
 
-
-database.connect()
-
-
 class DatabaseProvider(object):
+    
+    def __init__(self):
+        database.connect() 
     
     def get_songs(self, quantity, score) -> str:
         #get result from database as Peewee model
@@ -90,8 +76,18 @@ class DatabaseProvider(object):
         print(song_id)
         return 200
     
-    def get_albums(self, quantity) -> str:
-        return album,200
+    def get_albums(self, quantity, album_id) -> str:
+        if album_id:
+            result = Album.select().where(Album.id == album_id)          
+        elif quantity:
+            result = Album.select().order_by(fn.Rand()).limit(int(quantity))
+        else:
+            result = Album.select()
+        if result:
+            list_result = [row for row  in result.dicts()]    
+            return json.dumps(list_result),200
+        else:
+            return 400
     
     def create_album(self, album) ->str:
         print(album)

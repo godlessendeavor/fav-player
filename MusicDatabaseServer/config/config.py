@@ -11,11 +11,10 @@ Created on Nov 12, 2019
 #   - env variables may override (in docker setup etc)
 
 import json
-
+import os
 
 # first load config from a json file,
-#appconf = json.load(open(os.environ["MUSICDB_CONFIG_PATH"]))
-appconf = json.load(open('/config/musicdb.conf'))
+appconf = json.load(open(os.environ["MUSICDB_CONFIG_FILE"]))
 
 # database config
 DATABASE_HOST = appconf['music_db']['DATABASE_HOST']

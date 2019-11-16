@@ -19,7 +19,12 @@ paths:
           name: quantity
           type: integer
           required: false
-          description: Number of albums to get. If not indicated it will return all albums.
+          description: Number of random albums to get. If not indicated it will return all albums.
+        - in: query
+          name: album_id
+          type: integer
+          required: false
+          description: Id of album to get. If this parameter is set the parameter quantity will not be checked.
         tags:
         - public
         operationId: api.albums.get_albums

@@ -8,8 +8,8 @@ from providers.DatabaseProvider import DatabaseProvider
 
 
 @inject
-def get_albums(data_provider=DatabaseProvider, quantity = 1) -> str:
-    return data_provider().get_albums(quantity)
+def get_albums(data_provider=DatabaseProvider, quantity = None, album_id = None) -> str:
+    return data_provider().get_albums(quantity, album_id)
 
 @inject
 def create_album(data_provider=DatabaseProvider, album = None):
