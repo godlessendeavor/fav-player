@@ -2,17 +2,22 @@ from peewee import *
 from playhouse.shortcuts import model_to_dict, dict_to_model
 from config import config
 import json
+#from types import SimpleNamespace as Namespace
 
 
 import logging
 
+#set log configuration
+log_level = logging.getLevelName(config.LOGGING_LEVEL)
+
 logging.basicConfig(
     format='[%(asctime)-15s] [%(name)s] %(levelname)s]: %(message)s',
-    level=logging.DEBUG
+    level=log_level
 )
+logger = logging.getLogger(__name__)
 
-
-database = MySQLDatabase('music', 
+#set database configuration
+database = MySQLDatabase(config.DATABASE_NAME, 
                          **{'charset': 'utf8', 
                             'sql_mode': 'PIPES_AS_CONCAT', 
                             'use_unicode': True, 
@@ -47,6 +52,7 @@ class Favorites(BaseModel):
     score = FloatField(constraints=[SQL("DEFAULT 0")])
     track_no = IntegerField(constraints=[SQL("DEFAULT 0")])
     track_title = CharField()
+    file_name = CharField()
     type = TextField(null=True)
 
     class Meta:
@@ -57,6 +63,10 @@ class DatabaseProvider(object):
     
     def __init__(self):
         database.connect() 
+        
+    def _search_song_by_title_and_album_id(self, song_title, album_id):
+        result = Favorites.select().where((Favorites.disc_id == album_id) & (Favorites.track_title == song_title))
+        return [row for row  in result.dicts()]
     
     def get_songs(self, quantity, score) -> str:
         #get result from database as Peewee model
@@ -65,15 +75,50 @@ class DatabaseProvider(object):
         return json.dumps(list_result),200
     
     def create_song(self, song) ->str:
-        print(song)
+        fav = Favorites()
+        #first copy compulsory fields and validate types
+        try:            
+            fav.track_no = int(song['track_number'])
+            fav.track_title = song['title']
+            fav.score = float(song['score'])
+            fav.disc_id = int(song['disc_id'])
+            fav.file_name = song['file_name']
+        except KeyError:
+            logger.exception('Exception on key when creating favorite song')
+            return 400
+        except ValueError:
+            logger.exception('Exception on value when creating favorite song')
+            return 400
+        #now copy optional fields
+        try:
+            fav.type = song['type']            
+        except KeyError:
+            logger.warning('Type of song was not provided for song: ', song)   
+        
+        try:
+            fav.type = song['_id']
+        except KeyError:
+            #Id was not provided search song by title and disc_id, perhaps it already exists            
+            result = self._search_song_by_title_and_album_id(fav.track_title, fav.disc_id)
+            if result[0]:
+                try:
+                    fav.id = result[0]['id']
+                except KeyError:
+                    logger.exception('Exception on value when creating favorite song')
+        #save object in database
+        fav.save()
         return 200
     
     def update_song(self, song) ->str:
-        print(song)
-        return 200
+        return self.create_song(song)
     
     def delete_song(self, song_id) ->str:
-        print(song_id)
+        fav = Favorites.get(Favorites.id == song_id)
+        try:
+            fav.delete_instance()
+        except Exception as ex:
+            logger.error('Exception when deleting favorite song: '+str(ex))
+            return 400
         return 200
     
     def get_albums(self, quantity, album_id) -> str:
@@ -90,15 +135,48 @@ class DatabaseProvider(object):
             return 400
     
     def create_album(self, album) ->str:
-        print(album)
+        #load the object and convert to album
+        #TODO: could we use the next line to convert to object with attributes from json dict?
+        #album_entry = json.loads(album, object_hook=lambda d: Namespace(**d))       
+        
+        album_entry = Album()
+        #first copy compulsory fields and validate types
+        try:            
+            album_entry.group_name = album['band']
+            album_entry.title      = album['title']
+            album_entry.path       = album['path']
+            album_entry.year       = int(album['year'])
+        except KeyError:
+            logger.exception('Exception on key when creating album')
+            return 400
+        except ValueError:
+            logger.exception('Exception on value when creating album')
+            return 400
+        #now copy optional fields
+        try:
+            album_entry.mark     = float(album['score'])   
+            album_entry.review   = album['review']
+            album_entry.type     = album['type']
+            album_entry.loc      = album['country']   
+            album_entry.copy     = album['copy']
+            album_entry.style    = album['style']  
+        except KeyError:
+            logger.warning('Type was not provided for album: ', album)  
+        except ValueError:
+            logger.warning('Exception on value when creating album', album) 
         return 200
     
     def update_album(self, album) ->str:
-        print(album)
+        self.create_album(album)
         return 200
     
     def delete_album(self, album_id) ->str:
-        print(album_id)
+        album_entry = Album.get(Album.id == album_id)
+        try:
+            album_entry.delete_instance()
+        except Exception:
+            logger.exception('Exception when deleting album')
+            return 400
         return 200
     
     

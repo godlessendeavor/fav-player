@@ -26,7 +26,7 @@ services:
      image: mysql:8.0.17
      command: --default-authentication-plugin=mysql_native_password
      environment:
-       MYSQL_DATABASE: 'music'
+       MYSQL_DATABASE: 'music_test'
        MYSQL_USER: 'root'
 #      Password for root access
        MYSQL_ROOT_PASSWORD: 'nevermore'

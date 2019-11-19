@@ -187,6 +187,7 @@ definitions:
       type:         { type: string }
       score:        { type: string }
       review:       { type: string }
+      copy:         { type: string }
     required:
       - band
       - title

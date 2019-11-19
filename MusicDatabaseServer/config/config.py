@@ -17,9 +17,11 @@ import os
 appconf = json.load(open(os.environ["MUSICDB_CONFIG_FILE"]))
 
 # database config
-DATABASE_HOST = appconf['music_db']['DATABASE_HOST']
-DATABASE_PORT = appconf['music_db']['DATABASE_PORT']
-DATABASE_NAME = appconf['music_db']['DATABASE_NAME']
-DATABASE_USER = appconf['music_db']['DATABASE_USER']
+DATABASE_HOST     = appconf['music_db']['DATABASE_HOST']
+DATABASE_PORT     = appconf['music_db']['DATABASE_PORT']
+DATABASE_NAME     = appconf['music_db']['DATABASE_NAME']
+DATABASE_USER     = appconf['music_db']['DATABASE_USER']
 DATABASE_PASSWORD = appconf['music_db']['DATABASE_PASSWORD']
+
+LOGGING_LEVEL = appconf['logging']['LOGGING_LEVEL']
 
