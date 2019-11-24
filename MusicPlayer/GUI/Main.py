@@ -9,6 +9,10 @@ import traceback
 from tkinter import ttk
 from ttkthemes import themed_tk as tk
 
+import musicdb_client
+from musicdb_client.rest import ApiException
+from musicdb_client.configuration import Configuration as Musicdb_config
+
 from config import config
 from music.Song import Song
 from music.MediaPlayer import MyMediaPlayer
@@ -25,6 +29,10 @@ class GUI():
         self._music_path = self._config_reader.get_default_path()
         self._details_thread = threading.Thread(target=self._start_count, args =(lambda : self._stop_details_thread, ))
         self._stop_details_thread = False
+        self._musicdb_config = Musicdb_config()
+        #TODO: get localhost from player config
+        self._musicdb_config.host = "http://localhost:2020"
+        self._musicdb_config.debug = True
         #always initialize layout at the end because it contains the gui main loop
         self._init_layout() 
 
@@ -49,11 +57,16 @@ class GUI():
         # Create the self._menubar
         self._menubar = Menu(self._window_root)
         self._window_root.config(menu=self._menubar)
-        # Create the _sub_menu            
-        self._sub_menu = Menu(self._menubar, tearoff=0)
-        self._menubar.add_cascade(label="File", menu=self._sub_menu)
-        self._sub_menu.add_command(label="Open", command=self._browse_file)
-        self._sub_menu.add_command(label="Exit", command=self._window_root.destroy)
+        # Create the File sub menu            
+        self._file_sub_menu = Menu(self._menubar, tearoff=0)
+        self._menubar.add_cascade(label="File", menu=self._file_sub_menu)
+        self._file_sub_menu.add_command(label="Open", command=self._browse_file)
+        self._file_sub_menu.add_command(label="Exit", command=self._window_root.destroy)
+        # Create the Play sub menu            
+        self._play_sub_menu = Menu(self._menubar, tearoff=0)
+        self._menubar.add_cascade(label="Play", menu=self._play_sub_menu)
+        self._play_sub_menu.add_command(label="Favorites random", command=self._play_favs)
+        
     
         # self._window_root.iconbitmap(r'images/melody.ico')
         
@@ -184,6 +197,15 @@ class GUI():
         self._window_root.tk.splitlist(file_names)
         for file_name in file_names:
             self._add_to_playlist(file_name) 
+            
+    def _play_favs(self):
+        musicdb = musicdb_client.PublicApi(musicdb_client.ApiClient(self._musicdb_config))
+        try:
+            #gets a favorite song list according to the parameters
+            result = musicdb.api_songs_get_songs(quantity = 1, score = 5)
+            print(result)
+        except ApiException as e:
+            print("Exception when calling PublicApi->api_songs_get_songs: %s\n" % e)
 
     
     def _add_to_playlist(self, path_name):
