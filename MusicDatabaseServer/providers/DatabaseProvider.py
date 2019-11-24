@@ -61,6 +61,8 @@ class Favorites(BaseModel):
 
 class DatabaseProvider(object):
     
+    fav_name_map = {'id': 'id', 'disc_id': 'disc_id', 'track_title': 'title', 'file_name': 'file_name', 'score': 'score', 'track_no': 'track_number', 'type': 'type'}
+    
     def __init__(self):
         database.connect() 
         
@@ -71,8 +73,10 @@ class DatabaseProvider(object):
     def get_songs(self, quantity, score) -> str:
         #get result from database as Peewee model
         result = Favorites.select().where(Favorites.score > score).order_by(fn.Rand()).limit(int(quantity))
-        list_result = [row for row  in result.dicts()]
-        return json.dumps(list_result),200
+        #get results from the query and map the key names to the app_definition response object names
+        list_result = [{DatabaseProvider.fav_name_map[name]: val for name, val in row.items()} for row  in result.dicts()]
+        logger.debug('Getting result for get_songs: %s', list_result)
+        return {'songs' : list_result}
     
     def create_song(self, song) ->str:
         fav = Favorites()
@@ -107,7 +111,7 @@ class DatabaseProvider(object):
                     logger.exception('Exception on value when creating favorite song')
         #save object in database
         fav.save()
-        return 200
+        return song,200
     
     def update_song(self, song) ->str:
         return self.create_song(song)
@@ -129,8 +133,9 @@ class DatabaseProvider(object):
         else:
             result = Album.select()
         if result:
-            list_result = [row for row  in result.dicts()]    
-            return json.dumps(list_result),200
+            list_result = [row for row  in result.dicts()]   
+            logger.debug('Getting result for get_songs: %s', list_result) 
+            return list_result,200
         else:
             return 400
     
@@ -164,11 +169,10 @@ class DatabaseProvider(object):
             logger.warning('Type was not provided for album: ', album)  
         except ValueError:
             logger.warning('Exception on value when creating album', album) 
-        return 200
+        return album,200
     
     def update_album(self, album) ->str:
-        self.create_album(album)
-        return 200
+        return self.create_album(album)
     
     def delete_album(self, album_id) ->str:
         album_entry = Album.get(Album.id == album_id)

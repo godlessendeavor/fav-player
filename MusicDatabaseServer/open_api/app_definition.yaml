@@ -11,7 +11,7 @@ info:
 schemes:
  - http
 paths:             
-  /music/album: #make sure to not leave trailing slashes in the path or Flask will redirect the response to the URL with trailing slash 
+  /music/albums: #make sure to not leave trailing slashes in the path or Flask will redirect the response to the URL with trailing slash 
       get:
         summary: 'Fetch albums from the music database'
         parameters:
@@ -88,9 +88,9 @@ paths:
            '200':
               description: OK     
               
-  /music/fav_song: #make sure to not leave trailing slashes in the path or Flask will redirect the response to the URL with trailing slash 
+  /music/fav_songs: #make sure to not leave trailing slashes in the path or Flask will redirect the response to the URL with trailing slash 
       get:
-        summary: 'Fetch random song from the favorites database'
+        summary: 'Fetch random songs from the favorites database'
         parameters:
         - in: query
           name: quantity
@@ -107,11 +107,14 @@ paths:
         operationId: api.songs.get_songs
         responses:
           '200':
-              description: Fetch (a) random song(s) from the favorites database
+              description: Fetch random songs from the favorites database
               schema:
-                 type: array
-                 items:
-                 $ref: '#/definitions/song'   
+                 type: object
+                 properties:
+                    songs:
+                       type: array
+                       items:
+                          $ref: '#/definitions/song'   
       post:
          summary: Creates a new favorite song.
          consumes:
@@ -188,11 +191,7 @@ definitions:
       score:        { type: string }
       review:       { type: string }
       copy:         { type: string }
-    required:
-      - band
-      - title
-      - year
-      - path
+   
       
   song:
     type: object
@@ -204,12 +203,7 @@ definitions:
       track_number: { type: string }
       score:        { type: string }
       type:         { type: string }
-    required:
-      - disc_id
-      - title
-      - file_name
-      - track_number
-      - score
+   
       
 
 
