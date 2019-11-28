@@ -11,7 +11,7 @@ def check_media(func):
             return func(self, *args, **kwargs)
     return inner
 
-class MyMediaPlayer:
+class MyMediaPlayer(object):
     """Simple audio/video player.
     """
     def __init__(self):

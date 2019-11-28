@@ -5,38 +5,47 @@ Created on Aug 22, 2019
 '''
 
 import os
-from mutagen.mp3 import MP3
+from mutagen.mp3 import MP3, MutagenError
 from mp3_tagger import MP3File
+from music.album import Album
+from musicdb_client.models.song import Song as DB_song
+from config import config
+import logging
+#set log configuration
+log_level = logging.getLevelName(config.LOGGING_LEVEL)
 
-class Song(object):
+logging.basicConfig(
+    format='[%(asctime)-15s] [%(name)s] %(levelname)s]: %(message)s',
+    level=log_level
+)
+logger = logging.getLogger(__name__)
+
+class Song(DB_song):
     '''
-    This is the object for songs
+    This is the model for songs in the Music Player
     '''
-
-
+    
     def __init__(self):
-        '''
-        
-        '''
-        self._album = ""
-        self._title = ""
-        self._band = ""
-        self._minutes = 0
-        self._seconds = 0
-        self._abs_path = ""
+        super().__init__()
+        self._album   = None
+        self._minutes = None
+        self._seconds = None
         
     @property
     def album(self):
         return self._album
-    
-    @property
-    def title(self):
-        return self._title
-    
+
+    @album.setter
+    def album(self, album):
+        self._album = album
+        
     @property
     def band(self):
-        return self._band
-    
+        if self._album:
+            return self._album.band
+        else:
+            return None
+ 
     @property
     def minutes(self):
         return self._minutes
@@ -48,20 +57,21 @@ class Song(object):
     @property
     def total_length(self):
         return str(self.minutes) + ":" + str(self.seconds)
+
     
-    @property
-    def abs_path(self):
-        return self._abs_path
-    
-    def create_song(self, song_path):
+    def create_song_from_file(self, song_path):
         self._abs_path = song_path
         total_length = 0
         #get attributes
         file_data = os.path.splitext(song_path)
     
         if file_data[1] == '.mp3':
-            audio = MP3(song_path)
-            total_length = audio.info.length
+            try:
+                audio = MP3(song_path)
+                total_length = audio.info.length
+            except MutagenError:
+                logger.exception('Error when trying to get MP3 information.')
+                #TODO: raise own exception
         else:
             #TODO
             pass
@@ -81,9 +91,8 @@ class Song(object):
             self._band = tagsv2['artist']
             self._album = tagsv2['album']
             self._title = tagsv2['song']
-        except Exception as ex:
-            print(ex)
-            print("Some exception occurred while reading MP3 tags")
+        except Exception:
+            logger.exception("Some exception occurred while reading MP3 tags. ")
             
         
         

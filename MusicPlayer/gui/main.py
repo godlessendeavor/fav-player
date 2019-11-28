@@ -14,8 +14,9 @@ from musicdb_client.rest import ApiException
 from musicdb_client.configuration import Configuration as Musicdb_config
 
 from config import config
-from music.Song import Song
-from music.MediaPlayer import MyMediaPlayer
+from music.song import Song
+from music.media_player import MyMediaPlayer
+
 
 
 class GUI():
@@ -25,14 +26,16 @@ class GUI():
         self._paused = FALSE          
         self._muted  = FALSE
         self._playlist = {}  #dictionary containing the song objects of the playlist  
-        self._config_reader = config.PlayerConfig()
-        self._music_path = self._config_reader.get_default_path()
+        self._config_reader = config
+        #TODO: get the path from the config file
+        #self._music_path = config.MUSIC_PATH
         self._details_thread = threading.Thread(target=self._start_count, args =(lambda : self._stop_details_thread, ))
         self._stop_details_thread = False
         self._musicdb_config = Musicdb_config()
         #TODO: get localhost from player config
         self._musicdb_config.host = "http://localhost:2020"
         self._musicdb_config.debug = True
+        self._musicdb = musicdb_client.PublicApi(musicdb_client.ApiClient(self._musicdb_config))
         #always initialize layout at the end because it contains the gui main loop
         self._init_layout() 
 
@@ -110,7 +113,7 @@ class GUI():
         
         #PLAYLIST POUP
         self._playlist_popup = tkinter.Menu(self._window_root, tearoff=0)
-        self._playlist_popup.add_command(label="Command TODO", command=self._playlistbox_selection)
+        self._playlist_popup.add_command(label="Add song to favorites", command=self._playlistbox_add_to_favorites)
         self._playlist_popup.add_separator()
 
         def do_playlist_popup(event):
@@ -186,23 +189,35 @@ class GUI():
         self._window_root.mainloop()
 
 
-    def _playlistbox_selection(self):
+    def _playlistbox_add_to_favorites(self):
         #TODO: add command functionality and remove print
-        print(self._playlist[self._playlist_popup.selection].band)
+        song = self._playlist[self._playlist_popup.selection] 
+        self._musicdb.api_songs_update_song(song)
+        
+        
+    def _playlistbox_double_click(self):
+        item = self._playlist[self._playlist_popup.selection].band
+        print("you clicked on", item)
+        
 
 
     ###################BUTTON ACTIONS#####################################################################
     def _browse_file(self):
-        file_names = filedialog.askopenfilenames(parent=self._window_root, title="Choose files")
-        self._window_root.tk.splitlist(file_names)
+        #file_names = filedialog.askopenfilenames(parent=self._window_root, title="Choose files")
+        #self._window_root.tk.splitlist(file_names)
+        #TODO: remove the following hardocded list for testing and uncomment those lines above
+        path = '/media/thrasher/BIG_DISK2/MUSIC/Agalloch/2014\ -\ The\ Serpent\ And\ The\ Sphere/'
+        file_names = [path + '01-agalloch-birth_and_death_of_the_pillars_of_creation.mp3', 
+                      path + '04-agalloch-dark_matter_gods.mp3']
         for file_name in file_names:
+            print(file_name)
             self._add_to_playlist(file_name) 
             
-    def _play_favs(self):
-        musicdb = musicdb_client.PublicApi(musicdb_client.ApiClient(self._musicdb_config))
+    def _play_favs(self):        
         try:
             #gets a favorite song list according to the parameters
-            result = musicdb.api_songs_get_songs(quantity = 1, score = 5)
+            #TODO: check why this is failing
+            result = self._musicdb.api_songs_get_songs(quantity = 1, score = 5)
             print(result)
         except ApiException as e:
             print("Exception when calling PublicApi->api_songs_get_songs: %s\n" % e)
@@ -211,7 +226,7 @@ class GUI():
     def _add_to_playlist(self, path_name):
         file_name = os.path.basename(path_name)
         song = Song()
-        song.create_song(path_name)  
+        song.create_song_from_file(path_name)  
         index = 1            
         pl_index = self._playlistbox.insert("", index, text="Band Name", 
                                  values=(file_name, song.title, song.band, song.album, song.total_length)) 
@@ -285,7 +300,7 @@ class GUI():
             self._muted = TRUE
         
         
-    #######################MAIN GUI EVENTS#################################
+    #######################MAIN gui EVENTS#################################
     def _on_closing(self):
         self._stop_music()
         self._stop_details_thread = True
