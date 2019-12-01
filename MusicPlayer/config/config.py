@@ -15,4 +15,5 @@ mpconf = json.load(open(os.environ["MUSIC_CONFIG_FILE"]))
 
 # database config
 LOGGING_LEVEL = mpconf['logging']['LOGGING_LEVEL']
-        
+MUSIC_PATH = mpconf['music_player']['MUSIC_PATH']
+MUSIC_DB_HOST = mpconf['music_db']['HOST']        
