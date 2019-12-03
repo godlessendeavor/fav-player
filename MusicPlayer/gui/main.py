@@ -1,13 +1,13 @@
 import os
 import threading
 import time
+import traceback
 import tkinter.messagebox
 from tkinter import *
 from tkinter import filedialog
-import traceback
-
 from tkinter import ttk
 from ttkthemes import themed_tk as tk
+from PIL import ImageTk, Image as PILImage
 
 import musicdb_client
 from musicdb_client.rest import ApiException
@@ -15,6 +15,8 @@ from musicdb_client.configuration import Configuration as Musicdb_config
 
 from config import config
 from music.song import Song
+from music.album import Album
+from music.album_manager import AlbumManager
 from music.media_player import MyMediaPlayer
 
 
@@ -25,7 +27,8 @@ class GUI():
         self._player = MyMediaPlayer()
         self._paused = FALSE          
         self._muted  = FALSE
-        self._playlist = {}  #dictionary containing the song objects of the playlist  
+        self._playlist = {}   #dictionary containing the song objects of the playlist  
+        self._albums_list = {} #dictionary containing the album objects for the album list
         self._config_reader = config
         self._music_path = config.MUSIC_PATH
         self._details_thread = threading.Thread(target=self._start_count, args =(lambda : self._stop_details_thread, ))
@@ -197,17 +200,17 @@ class GUI():
                              
         #FRAMES STRUCTURE
         
-        self._left_album_frame = Frame(self._albums_window)
+        self._top_album_frame = Frame(self._albums_window)
+        self._top_album_frame.pack(side=TOP)
+        
+        self._left_album_frame = Frame(self._top_album_frame)
         self._left_album_frame.pack(side=LEFT, padx=30, pady=30)
         
-        self._right_album_frame = Frame(self._albums_window)
+        self._right_album_frame = Frame(self._top_album_frame)
         self._right_album_frame.pack(side=RIGHT, padx=30, pady=30)
-        
-        self._top_right_album_frame = Frame(self._right_album_frame)
-        self._top_right_album_frame.pack()
-        
-        self._bottom_right_album_frame = Frame(self._right_album_frame)
-        self._bottom_right_album_frame.pack()
+               
+        self._bottom_album_frame = Frame(self._albums_window)
+        self._bottom_album_frame.pack(side=BOTTOM)
         
         #ALBUM LIST
         
@@ -264,11 +267,22 @@ class GUI():
         self._album_list_popup.add_command(label="Sort list", command=self._sort_albums_list)
         self._album_list_popup.add_separator()
         self._album_list_popup.add_command(label="Sort list by this field", command=self._sort_albums_by_field)
-         
-                
+                         
         #add popup to album_list treeview        
         self._album_listbox.bind("<Button-3>", do_album_list_popup)  
         self._album_listbox.bind('<Double-Button-1>', do_album_list_play_song)
+        
+        #album image
+        self._album_workart_canvas = Canvas(self._top_album_frame, width = 300, height = 300)  
+        self._album_workart_canvas.pack()  
+        self._album_workart_canvas_frame = self._album_workart_canvas.create_window((0,0),
+                                                                     window=self._right_album_frame, 
+                                                                     anchor = NW)
+        #TODO: get initial image!
+        #pil_image = PILImage.open("")
+        #pil_image = pil_image.resize((250, 250), PILImage.ANTIALIAS)
+        #self._current_album_img = ImageTk.PhotoImage(pil_image, master=self._albums_window)  
+        #self._album_workart_canvas.create_image(20, 20, anchor=NW, image=self._current_album_img) 
         
      
 
@@ -276,12 +290,8 @@ class GUI():
     ################### MENU ACTIONS ######################################################
 
     def _browse_file(self):
-        #file_names = filedialog.askopenfilenames(parent=self._window_root, title="Choose files")
-        #self._window_root.tk.splitlist(file_names)
-        #TODO: remove the following hardcoded list for testing and uncomment those lines above
-        path = '/media/thrasher/BIG_DISK2/MUSIC/Agalloch/2014\ -\ The\ Serpent\ And\ The\ Sphere/'
-        file_names = [path + '01-agalloch-birth_and_death_of_the_pillars_of_creation.mp3', 
-                      path + '04-agalloch-dark_matter_gods.mp3']
+        file_names = filedialog.askopenfilenames(parent=self._window_root, title="Choose files")
+        self._window_root.tk.splitlist(file_names)
         for file_name in file_names:
             print(file_name)
             self._add_to_playlist(file_name) 
@@ -296,8 +306,14 @@ class GUI():
             print("Exception when calling PublicApi->api_songs_get_songs: %s\n" % e)
             
     def _show_album_list(self):
+        #TODO: do we need to call a toplevel?
         #self._albums_window = Toplevel(self._window_root)
         self._init_albums_window_layout()
+        #albums_list = self._musicdb.api_albums_get_albums()
+        albums_list = [Album()]
+        self._add_to_album_list(albums_list)
+        #print(albums_list)
+        AlbumManager.get_albums_from_collection()
         
 
     ################### POP UP ACTIONS ######################################################
@@ -393,7 +409,10 @@ class GUI():
     def _on_closing(self):
         self._stop_music()
         self._stop_details_thread = True
-        self._albums_window.destroy()
+        try:
+            self._albums_window.destroy()
+        except:
+            pass
         self._window_root.destroy()
         
     def _on_closing_album_window(self):        
@@ -413,6 +432,21 @@ class GUI():
         self._playlist[pl_index] = song
         #TODO: why this index + 2?
         index += 2
+        
+    def _add_to_album_list(self, album_list):
+        for album in album_list:
+            index = 1 
+            album_id = self._album_listbox.insert("", index, text="Albums",
+                                       values=(album.band, 
+                                               album.title, 
+                                               album.style, 
+                                               album.year, 
+                                               album.country, 
+                                               album.type, 
+                                               album.score, 
+                                               "NO"))
+            self._albums_list[album_id] = album
+            index += 2
         
     def _show_details(self):
         self._details_thread.start()
