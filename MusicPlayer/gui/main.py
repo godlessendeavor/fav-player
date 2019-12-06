@@ -23,6 +23,14 @@ from music.media_player import MyMediaPlayer
 
 class GUI():
     
+    class Splash(Toplevel):
+        def __init__(self, parent):
+            Toplevel.__init__(self, parent)
+            self.title("Loading...")
+    
+            ## required to make window show before the program gets to the mainloop
+            self.update()
+    
     def __init__(self):
         self._player = MyMediaPlayer()
         self._paused = FALSE          
@@ -310,10 +318,15 @@ class GUI():
         #self._albums_window = Toplevel(self._window_root)
         self._init_albums_window_layout()
         #albums_list = self._musicdb.api_albums_get_albums()
-        albums_list = [Album()]
-        self._add_to_album_list(albums_list)
+        #TODO uncomment previous when Swagger generator issue is solved 
+        # and check with the albums list provided by album manager. Maybe album manager should compare those two dicts
+        
         #print(albums_list)
-        AlbumManager.get_albums_from_collection()
+        splash = self.Splash(self._albums_window)
+        album_dict = AlbumManager.get_albums_from_collection()
+        print(f"Lenght of dict is {len(album_dict)}")
+        self._add_to_album_list(album_dict)
+        splash.destroy()
         
 
     ################### POP UP ACTIONS ######################################################
@@ -433,20 +446,34 @@ class GUI():
         #TODO: why this index + 2?
         index += 2
         
-    def _add_to_album_list(self, album_list):
-        for album in album_list:
-            index = 1 
-            album_id = self._album_listbox.insert("", index, text="Albums",
-                                       values=(album.band, 
-                                               album.title, 
-                                               album.style, 
-                                               album.year, 
-                                               album.country, 
-                                               album.type, 
-                                               album.score, 
-                                               "NO"))
-            self._albums_list[album_id] = album
-            index += 2
+    def _add_to_album_list(self, album_dict):
+        band_index = 1 
+        for band, albums in album_dict.items():
+            band_root = self._album_listbox.insert("", band_index, text=band,
+                                           values=(band, 
+                                                   "", 
+                                                   "", 
+                                                   "", 
+                                                   "", 
+                                                   "", 
+                                                   "", 
+                                                   ""))
+            print(band, band_root)
+            band_index += 1            
+            album_index = 1 
+            for album_key, album in albums.items():
+                print(album)
+                album_id = self._album_listbox.insert(band_root, album_index, 
+                                           values=("", 
+                                                   album.title, 
+                                                   album.style, 
+                                                   album.year, 
+                                                   album.country, 
+                                                   album.type, 
+                                                   album.score, 
+                                                   "NO"))
+                self._albums_list[album_id] = album
+                album_index += 1
         
     def _show_details(self):
         self._details_thread.start()

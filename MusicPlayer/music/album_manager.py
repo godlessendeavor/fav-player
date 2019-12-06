@@ -7,6 +7,8 @@ from functools import reduce, lru_cache
 import os
 from config import config
 import re
+from music.album import Album
+from pymysql.constants.CR import CR_SHARED_MEMORY_CONNECT_ABANDONED_ERROR
 
 class AlbumManager:
     _collection_root = config.MUSIC_PATH
@@ -31,19 +33,28 @@ class AlbumManager:
         key, val = next(iter( dir_tree.items()))
         return val
     
+    #TODO: make async function using asyncio. Follow https://realpython.com/async-io-python/
     @staticmethod  
     def get_albums_from_collection():
         dir_tree = AlbumManager._get_music_directory_tree()
-        for band, albums in dir_tree.items():
+        res_tree= {}
+        for band, albums in list(dir_tree.items()):
             for album in albums:
-                x = re.search("[0-9][ ]*-[ ]*\w", album)
+                x = re.search("[0-9][ ]+-[ ]+.+", album)
                 if x:
-                    #TODO this will be part of returning dict to the application 
-                    #print(album)
-                    pass
+                    #replace the album key with the object from Album class and fill it
+                    #TODO: add year stripped from the name
+                    album_obj = Album()
+                    album_obj.band = band
+                    album_obj.title = album.split('-',2)[1]
+                    if band not in res_tree:
+                        res_tree[band] = {}
+                    res_tree[band][album] = album_obj
+                    #print(res_tree)
                 else:
-                    print('Album {album} is not following the format'.format(album=album))
-                
+                    print('Album {album} of {band} is not following the format'.format(album=album, band=band))
+        print(res_tree)
+        return res_tree
         
         
         
