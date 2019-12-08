@@ -276,22 +276,43 @@ class GUI():
             finally:
                 # make sure to release the grab (Tk 8.0a1 only)
                 self._album_list_popup.grab_release()  
+                           
                 
         def do_album_list_play_album():                         
             row = self._album_list_popup.selection
             album = self._albums_list[row]            
             file_names = [f for f in listdir(album.path) if isfile(join(album.path, f))]
-            self._window_root.tk.splitlist(file_names)
             for file_name in file_names:
                 self._add_to_playlist(os.path.join(album.path, file_name), album) 
-            #TODO: add songs from album to the playlistbox and start playing
-        
+            
+        def do_cover_art_show(event):
+            selection = self._album_listbox.identify_row(event.y)
+            try:
+                album = self._albums_list[selection]
+            except KeyError:
+                #if selected row is a from the band root then we do not continue
+                pass
+            else:
+                file_names = [f for f in listdir(album.path) if isfile(join(album.path, f))]
+                image = None
+                for file_name in file_names:
+                    if "front" in file_name.casefold():
+                        image = os.path.join(album.path, file_name)
+                        break
+                if image:
+                    pil_image = PILImage.open(image)
+                    pil_image = pil_image.resize((250, 250), PILImage.ANTIALIAS)
+                    self._current_album_img = ImageTk.PhotoImage(pil_image, master=self._albums_window)  
+                    self._album_workart_canvas.create_image(20, 20, anchor=NW, image=self._current_album_img) 
+            
         #album_list POUP
         self._album_list_popup = tkinter.Menu(self._albums_window, tearoff=0)
         self._album_list_popup.add_command(label="Play this item", command=do_album_list_play_album)
                 
         #add popup to album_list treeview        
         self._album_listbox.bind("<Button-3>", do_album_list_popup)  
+        #add Covert art change to treeview selection      
+        self._album_listbox.bind("<Button-1>", do_cover_art_show)  
         
         #album image
         self._album_workart_canvas = Canvas(self._top_album_frame, width = 300, height = 300)  
@@ -431,15 +452,18 @@ class GUI():
         song.album = album
         try:
             song.create_song_from_file(path_name)  
-            index = 1            
-            pl_index = self._playlistbox.insert("", index, text="Band Name", 
-                                     values=(file_name, song.title, song.band, song.album, song.total_length)) 
-            #add song to playlist dictionary, the index is the index in the playlist 
-            self._playlist[pl_index] = song
-            #TODO: why this index + 2?
-            index += 2        
         except:
             logger.exception("Failed to add song to the playlist")
+        else:            
+            index = 1         
+            if album:
+                album_title = album.title
+            else:
+                album_title = ""
+            pl_index = self._playlistbox.insert("", index, text="Band Name", 
+                                     values=(file_name, song.title, song.band, album_title, song.total_length)) 
+            #add song to playlist dictionary, the index is the index in the playlist 
+            self._playlist[pl_index] = song
         
     def _add_to_album_list(self, album_dict):
         band_index = 1 

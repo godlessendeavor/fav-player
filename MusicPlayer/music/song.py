@@ -69,6 +69,7 @@ class Song(DB_song):
         total_length = 0
         #get attributes
         file_data = os.path.splitext(song_path)
+        print(file_data)
     
         if file_data[1] == '.mp3':
             try:
@@ -77,31 +78,31 @@ class Song(DB_song):
             except MutagenError as ex:
                 logger.exception('Error when trying to get MP3 information.')
                 raise ex
+            else:                
+                # div - total_length/60, mod - total_length % 60
+                mins, secs = divmod(total_length, 60)
+                self._minutes = round(mins)
+                self._seconds = round(secs)
+                
+                try:
+                    #get tags
+                    mp3_file = MP3File(song_path)
+                    tags = mp3_file.get_tags()
+                    
+                    tagsv2 = tags['ID3TagV2']
+                    
+                    if not self._band:
+                        self._band = tagsv2['artist']
+                    if not self._album:
+                        self._album = tagsv2['album']
+                    if not self._title:
+                        self._title = tagsv2['song']
+                except Exception:
+                    logger.exception("Some exception occurred while reading MP3 tags.")
         else:
-            #TODO
-            pass
+            raise Exception("File is not MP3.")
+      
     
-        # div - total_length/60, mod - total_length % 60
-        mins, secs = divmod(total_length, 60)
-        self._minutes = round(mins)
-        self._seconds = round(secs)
-        
-        try:
-            #get tags
-            print(song_path)
-            mp3_file = MP3File(song_path)
-            tags = mp3_file.get_tags()
-            
-            tagsv2 = tags['ID3TagV2']
-            
-            if not self._band:
-                self._band = tagsv2['artist']
-            if not self._album:
-                self._album = tagsv2['album']
-            if not self._title:
-                self._title = tagsv2['song']
-        except Exception:
-            logger.exception("Some exception occurred while reading MP3 tags. ")
             
         
         
