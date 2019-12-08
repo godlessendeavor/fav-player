@@ -30,6 +30,7 @@ class Song(DB_song):
         self._album   = None
         self._minutes = None
         self._seconds = None
+        self._band    = None
         
     @property
     def album(self):
@@ -41,7 +42,7 @@ class Song(DB_song):
         
     @property
     def band(self):
-        if self._album:
+        if self._album:            
             return self._album.band
         else:
             return None
@@ -57,6 +58,10 @@ class Song(DB_song):
     @property
     def total_length(self):
         return str(self.minutes) + ":" + str(self.seconds)
+    
+    @property
+    def abs_path(self):
+        return self._abs_path
 
     
     def create_song_from_file(self, song_path):
@@ -69,9 +74,9 @@ class Song(DB_song):
             try:
                 audio = MP3(song_path)
                 total_length = audio.info.length
-            except MutagenError:
+            except MutagenError as ex:
                 logger.exception('Error when trying to get MP3 information.')
-                #TODO: raise own exception
+                raise ex
         else:
             #TODO
             pass
@@ -83,14 +88,18 @@ class Song(DB_song):
         
         try:
             #get tags
+            print(song_path)
             mp3_file = MP3File(song_path)
             tags = mp3_file.get_tags()
             
             tagsv2 = tags['ID3TagV2']
             
-            self._band = tagsv2['artist']
-            self._album = tagsv2['album']
-            self._title = tagsv2['song']
+            if not self._band:
+                self._band = tagsv2['artist']
+            if not self._album:
+                self._album = tagsv2['album']
+            if not self._title:
+                self._title = tagsv2['song']
         except Exception:
             logger.exception("Some exception occurred while reading MP3 tags. ")
             

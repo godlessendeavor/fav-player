@@ -5,13 +5,32 @@ Created on Dec 3, 2019
 '''
 from functools import reduce, lru_cache
 import os
-from config import config
+import dateutil.parser as date_parser
+import logging
 import re
 from music.album import Album
-from pymysql.constants.CR import CR_SHARED_MEMORY_CONNECT_ABANDONED_ERROR
+from config import config
+import musicbrainzngs
+import musicdb_client
+from musicdb_client.rest import ApiException
+from musicdb_client.configuration import Configuration as Musicdb_config
+
+
+#set log configuration
+log_level = logging.getLevelName(config.LOGGING_LEVEL)
+
+logging.basicConfig(
+    format='[%(asctime)-15s] [%(name)s] %(levelname)s]: %(message)s',
+    level=log_level
+)
+logger = logging.getLogger(__name__)
 
 class AlbumManager:
-    _collection_root = config.MUSIC_PATH
+    _collection_root = config.MUSIC_PATH    
+    _musicdb_config = Musicdb_config()
+    _musicdb_config.host = config.MUSIC_DB_HOST
+    _musicdb_config.debug = True
+    _musicdb = musicdb_client.PublicApi(musicdb_client.ApiClient(_musicdb_config))
     
     #TODO: consider caching for this: lru_cache vs CacheTools?
     @staticmethod  
@@ -34,8 +53,15 @@ class AlbumManager:
         return val
     
     #TODO: make async function using asyncio. Follow https://realpython.com/async-io-python/
+    #TODO: call the DB API and compare data
     @staticmethod  
     def get_albums_from_collection():
+        '''
+        Gets the albums collection from the configured Music Directory 
+        and compares with the database collection.
+        '''
+        
+        #albums_list = self._musicdb.api_albums_get_albums()
         dir_tree = AlbumManager._get_music_directory_tree()
         res_tree= {}
         for band, albums in list(dir_tree.items()):
@@ -43,18 +69,66 @@ class AlbumManager:
                 x = re.search("[0-9][ ]+-[ ]+.+", album)
                 if x:
                     #replace the album key with the object from Album class and fill it
-                    #TODO: add year stripped from the name
                     album_obj = Album()
                     album_obj.band = band
-                    album_obj.title = album.split('-',2)[1]
+                    album_split = album.split('-',2)
+                    album_obj.year = album_split[0]
+                    album_obj.title = album_split[1]
+                    album_obj.path = os.path.join(AlbumManager._collection_root,band,album)
                     if band not in res_tree:
                         res_tree[band] = {}
                     res_tree[band][album] = album_obj
-                    #print(res_tree)
                 else:
-                    print('Album {album} of {band} is not following the format'.format(album=album, band=band))
-        print(res_tree)
+                    logger.info('Album {album} of {band} is not following the format'.format(album=album, band=band))
         return res_tree
-        
+    
+    @staticmethod
+    def get_album_list_for_band(self, band_name, country, style):
+        '''
+        Gets the album list from a 
+        '''
+        musicbrainzngs.set_useragent("TODO: add name of app","1.0","TODO: add EMAIL from settings")
+        bands_list = musicbrainzngs.search_artists(artist = band_name, type = "group", country = country)
+        disambiguation_keywords = style.lower().split() 
+        filtered_bands = None
+        number_of_bands = 0
+        #check how many bands are returned in the search 
+        # check with the disambiguation contains at least some of the words in the style provided and filter to one band
+        if "artist-list" in bands_list.keys():
+            bands_with_same_name = [band_info for band_info in bands_list["artist-list"] if band_info["name"] == band_name]  
+            number_of_bands = len(bands_with_same_name)
+            if number_of_bands == 1:
+                filtered_bands = bands_with_same_name
+            elif number_of_bands > 1:
+                filtered_bands = [band_info for band_info in bands_with_same_name 
+                                  if any(word in band_info["disambiguation"].lower() for word in disambiguation_keywords)]
+                number_of_bands = len(filtered_bands)
+            
+        # there should be only one match
+        if number_of_bands == 1:
+            band_id = filtered_bands[0]['id']
+            result = musicbrainzngs.get_artist_by_id(band_id,
+                                                     includes=["release-groups"], 
+                                                     release_type=["album", "ep"])
+            #let's filter out the compilations
+            release_list = filter(lambda item: (item["type"] != "Compilation"), result["artist"]["release-group-list"])
+            album_year_list = []
+            for release in release_list:
+                date = release["first-release-date"]
+                year = None
+                try:
+                    year = date_parser.parse(date).year
+                except ValueError:
+                    logger.exception(f"Date {date} could not be parsed")
+                    #TODO: reraise?
+                album_year_list.append((release["title"], year))
+            
+            return album_year_list
+        elif number_of_bands > 1:
+            return "Too many bands with this description", [(band["name"],band["disambiguation"]) for band in filtered_bands] 
+        else:
+            return f"Could not find the band {band_name} and {country} in musicbrainz"
+
+
         
         

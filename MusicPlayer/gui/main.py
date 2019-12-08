@@ -4,10 +4,13 @@ import time
 import traceback
 import tkinter.messagebox
 from tkinter import *
-from tkinter import filedialog
+#from tkinter import filedialog
 from tkinter import ttk
 from ttkthemes import themed_tk as tk
 from PIL import ImageTk, Image as PILImage
+import logging
+from os import listdir
+from os.path import isfile, join
 
 import musicdb_client
 from musicdb_client.rest import ApiException
@@ -19,7 +22,14 @@ from music.album import Album
 from music.album_manager import AlbumManager
 from music.media_player import MyMediaPlayer
 
+#set log configuration
+log_level = logging.getLevelName(config.LOGGING_LEVEL)
 
+logging.basicConfig(
+    format='[%(asctime)-15s] [%(name)s] %(levelname)s]: %(message)s',
+    level=log_level
+)
+logger = logging.getLogger(__name__)
 
 class GUI():
     
@@ -195,7 +205,8 @@ class GUI():
         self._window_root.mainloop()
         
     
-    def _init_albums_window_layout(self):
+    def _init_albums_window_layout(self):        
+        #TODO: do we need to call a toplevel?
         self._albums_window = tk.ThemedTk()
         self._albums_window.protocol("WM_DELETE_WINDOW", self._on_closing_album_window)
         
@@ -236,7 +247,9 @@ class GUI():
         self._album_listbox.heading("Score", text="Score",anchor=W)        
         self._album_listbox.heading("InBackup", text="In Backup",anchor=W)
         self._album_listbox["show"] = "headings" #This will remove the first column from the viewer (first column of this widget is the identifier of the row)
-        
+        for col in self._album_listbox["columns"]:
+            self._album_listbox.heading(col, text=col, command=lambda _col=col: \
+                     GUI._treeview_sort_column(self._album_listbox, _col, False))
         
         self._album_listbox.column("Band",     minwidth=0, width=140)
         self._album_listbox.column("Title",    minwidth=0, width=200)
@@ -264,21 +277,21 @@ class GUI():
                 # make sure to release the grab (Tk 8.0a1 only)
                 self._album_list_popup.grab_release()  
                 
-        def do_album_list_play_song(event):                         
-            row = self._album_listbox.identify_row(event.y)
+        def do_album_list_play_album():                         
+            row = self._album_list_popup.selection
+            album = self._albums_list[row]            
+            file_names = [f for f in listdir(album.path) if isfile(join(album.path, f))]
+            self._window_root.tk.splitlist(file_names)
+            for file_name in file_names:
+                self._add_to_playlist(os.path.join(album.path, file_name), album) 
             #TODO: add songs from album to the playlistbox and start playing
         
         #album_list POUP
         self._album_list_popup = tkinter.Menu(self._albums_window, tearoff=0)
-        self._album_list_popup.add_command(label="Play this item", command=do_album_list_play_song)
-        self._album_list_popup.add_separator()
-        self._album_list_popup.add_command(label="Sort list", command=self._sort_albums_list)
-        self._album_list_popup.add_separator()
-        self._album_list_popup.add_command(label="Sort list by this field", command=self._sort_albums_by_field)
-                         
+        self._album_list_popup.add_command(label="Play this item", command=do_album_list_play_album)
+                
         #add popup to album_list treeview        
         self._album_listbox.bind("<Button-3>", do_album_list_popup)  
-        self._album_listbox.bind('<Double-Button-1>', do_album_list_play_song)
         
         #album image
         self._album_workart_canvas = Canvas(self._top_album_frame, width = 300, height = 300)  
@@ -301,8 +314,7 @@ class GUI():
         file_names = filedialog.askopenfilenames(parent=self._window_root, title="Choose files")
         self._window_root.tk.splitlist(file_names)
         for file_name in file_names:
-            print(file_name)
-            self._add_to_playlist(file_name) 
+            self._add_to_playlist(file_name, None) 
             
     def _play_favs(self):        
         try:
@@ -311,20 +323,13 @@ class GUI():
             result = self._musicdb.api_songs_get_songs(quantity = 1, score = 5)
             print(result)
         except ApiException as e:
-            print("Exception when calling PublicApi->api_songs_get_songs: %s\n" % e)
+            logger.exception("Exception when calling PublicApi->api_songs_get_songs: %s\n" % e)
             
     def _show_album_list(self):
-        #TODO: do we need to call a toplevel?
-        #self._albums_window = Toplevel(self._window_root)
         self._init_albums_window_layout()
-        #albums_list = self._musicdb.api_albums_get_albums()
-        #TODO uncomment previous when Swagger generator issue is solved 
-        # and check with the albums list provided by album manager. Maybe album manager should compare those two dicts
-        
-        #print(albums_list)
         splash = self.Splash(self._albums_window)
         album_dict = AlbumManager.get_albums_from_collection()
-        print(f"Lenght of dict is {len(album_dict)}")
+        logger.info(f"Lenght of dict is {len(album_dict)}")
         self._add_to_album_list(album_dict)
         splash.destroy()
         
@@ -338,18 +343,6 @@ class GUI():
         song = self._playlist[self._playlist_popup.selection] 
         self._musicdb.api_songs_update_song(song)
         
-        
-    ############### ALBUM LIST #############
-    
-    def _sort_albums_list(self):
-        pass
-        #TODO: implement album sort list
-        
-    def _sort_albums_by_field(self):
-        pass
-        #TODO: implement album sort list
-    
-
         
     ################### BUTTONS ACTIONS ######################################################
          
@@ -376,9 +369,7 @@ class GUI():
          
                 self._player.play_list(file_list)
             except Exception as ex:
-                track = traceback.format_exc()
-                print(track)
-                print('Exception while playing music: ' + str(ex)) 
+                logger.exception('Exception while playing music: ' + str(ex)) 
                 tkinter.messagebox.showerror('File not found', 'Player could not find the file. Please check again.')
 
     def _stop_music(self):        
@@ -434,17 +425,21 @@ class GUI():
         
     ######################### FUNCTION HELPERS #####################
     
-    def _add_to_playlist(self, path_name):
+    def _add_to_playlist(self, path_name, album):
         file_name = os.path.basename(path_name)
         song = Song()
-        song.create_song_from_file(path_name)  
-        index = 1            
-        pl_index = self._playlistbox.insert("", index, text="Band Name", 
-                                 values=(file_name, song.title, song.band, song.album, song.total_length)) 
-        #add song to playlist dictionary, the index is the index in the playlist 
-        self._playlist[pl_index] = song
-        #TODO: why this index + 2?
-        index += 2
+        song.album = album
+        try:
+            song.create_song_from_file(path_name)  
+            index = 1            
+            pl_index = self._playlistbox.insert("", index, text="Band Name", 
+                                     values=(file_name, song.title, song.band, song.album, song.total_length)) 
+            #add song to playlist dictionary, the index is the index in the playlist 
+            self._playlist[pl_index] = song
+            #TODO: why this index + 2?
+            index += 2        
+        except:
+            logger.exception("Failed to add song to the playlist")
         
     def _add_to_album_list(self, album_dict):
         band_index = 1 
@@ -458,11 +453,11 @@ class GUI():
                                                    "", 
                                                    "", 
                                                    ""))
-            print(band, band_root)
+            #print(band, band_root)
             band_index += 1            
             album_index = 1 
             for album_key, album in albums.items():
-                print(album)
+                #print(album)                
                 album_id = self._album_listbox.insert(band_root, album_index, 
                                            values=("", 
                                                    album.title, 
@@ -486,6 +481,25 @@ class GUI():
                 self._current_time_label['text'] = "Current Time" + ' - ' + self._player.get_time()
                 time.sleep(1)
             time.sleep(1)
+            
+    @staticmethod
+    def _treeview_sort_column(treeview, col, reverse):
+        '''
+        Function to sort the columns of a treeview when headings are clicked.
+        @param: treeview, the treeview to sort
+        @param: col, the column to sort
+        @reverse: parameter to specify if it has to be sorted in reverse.        
+        '''
+        l = [(treeview.set(k, col), k) for k in treeview.get_children('')]
+        l.sort(reverse=reverse)
+    
+        # rearrange items in sorted positions
+        for index, (val, k) in enumerate(l):
+            treeview.move(k, '', index)
+    
+        # reverse sort next time
+        treeview.heading(col, command=lambda: \
+                   GUI._treeview_sort_column(treeview, col, not reverse))
 
 
 if __name__ == '__main__':
