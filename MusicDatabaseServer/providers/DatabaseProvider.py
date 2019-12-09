@@ -1,10 +1,5 @@
 from peewee import *
-from playhouse.shortcuts import model_to_dict, dict_to_model
 from config import config
-import json
-#from types import SimpleNamespace as Namespace
-
-
 import logging
 
 #set log configuration

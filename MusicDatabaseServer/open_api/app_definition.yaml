@@ -34,7 +34,7 @@ paths:
               schema:
                  type: array
                  items:
-                 $ref: '#/definitions/album'   
+                    $ref: '#/definitions/album'   
       post:
          summary: Creates a new album.
          consumes:
@@ -45,7 +45,7 @@ paths:
              description: The album to create.
              required: true
              schema:
-               $ref: '#/definitions/album'
+                $ref: '#/definitions/album'
          tags:
            - public
          operationId: api.albums.create_album
@@ -180,7 +180,7 @@ definitions:
   album:
     type: object
     properties:
-      _id:          { type: string }
+      id:           { type: string }
       band:         { type: string }
       title:        { type: string }
       style:        { type: string }
@@ -196,7 +196,7 @@ definitions:
   song:
     type: object
     properties:
-      _id:          { type: string }
+      id:           { type: string }
       disc_id:      { type: string }
       title:        { type: string }
       file_name:    { type: string }
