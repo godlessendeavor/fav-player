@@ -339,20 +339,23 @@ class GUI():
             
     def _play_favs(self):        
         try:
-            #gets a favorite song list according to the parameters
-            #TODO: check why this is failing
-            result = self._musicdb.api_songs_get_songs(quantity = 1, score = 5)
-            print(result)
+            #get favorite song list according to the parameters
+            #TODO: show window to select quantity and score
+            quantity = 5
+            score = 5
+            songs = AlbumManager.get_favorites(quantity, score)
+            for song in songs:
+                self._add_to_playlist(song.abs_path, None) 
         except ApiException as e:
             logger.exception("Exception when calling PublicApi->api_songs_get_songs: %s\n" % e)
             
     def _show_album_list(self):
-        self._init_albums_window_layout()
+        #TODO: replace splash window by loading cursor or similar
         splash = self.Splash(self._albums_window)
-        album_dict = AlbumManager.get_albums_from_collection()
-        logger.info(f"Lenght of dict is {len(album_dict)}")
+        album_dict = AlbumManager.get_albums_from_collection()     
+        splash.destroy()      
+        self._init_albums_window_layout()
         self._add_to_album_list(album_dict)
-        splash.destroy()
         
 
     ################### POP UP ACTIONS ######################################################

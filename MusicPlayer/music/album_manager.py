@@ -14,6 +14,7 @@ import musicbrainzngs
 import musicdb_client
 from musicdb_client.rest import ApiException
 from musicdb_client.configuration import Configuration as Musicdb_config
+from builtins import staticmethod
 
 
 #set log configuration
@@ -61,7 +62,7 @@ class AlbumManager:
         and compares with the database collection.
         '''
         
-        #albums_list = self._musicdb.api_albums_get_albums()
+        #albums_list = _musicdb.api_albums_get_albums()
         dir_tree = AlbumManager._get_music_directory_tree()
         res_tree= {}
         for band, albums in list(dir_tree.items()):
@@ -83,7 +84,25 @@ class AlbumManager:
         return res_tree
     
     @staticmethod
-    def get_album_list_for_band(self, band_name, country, style):
+    def get_favorites(quantity, score):
+        #TODO: check why this is failing
+        fav_songs = None
+        result = AlbumManager._musicdb.api_songs_get_songs(quantity = quantity, score = score)
+        if result:            
+            if isinstance(result.songs, list):
+                for song in result.songs:
+                    albums = AlbumManager._musicdb.api_albums_get_albums(album_id = song.disc_id)
+                    if isinstance(albums, list):
+                        if len(albums) == 1:
+                            #TODO: check if album is in music directory
+                            song.abs_path = None    
+                fav_songs = result.song                    
+               
+        return fav_songs
+                    
+    
+    @staticmethod
+    def get_album_list_for_band(band_name, country, style):
         '''
         Gets the album list from a 
         '''
