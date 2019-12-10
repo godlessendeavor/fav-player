@@ -35,7 +35,7 @@ class AlbumManager:
     
     #TODO: consider caching for this: lru_cache vs CacheTools?
     @staticmethod  
-    #@lru_cache(maxsize=8)
+    @lru_cache(maxsize=8)
     def _get_music_directory_tree():
         '''
             Function that returns a nested dictionary with all files in the Music folder
@@ -60,11 +60,12 @@ class AlbumManager:
         '''
         Gets the albums collection from the configured Music Directory 
         and compares with the database collection.
-        '''
-        
-        #albums_list = _musicdb.api_albums_get_albums()
+        '''        
+        #First we get a directory tree with all the folders and files in the music directory tree
         dir_tree = AlbumManager._get_music_directory_tree()
-        res_tree= {}
+        #this will be our final directory tree
+        res_tree = {}
+        #let's check that the folders match our format Year - Title
         for band, albums in list(dir_tree.items()):
             for album in albums:
                 x = re.search("[0-9][ ]+-[ ]+.+", album)
@@ -73,38 +74,57 @@ class AlbumManager:
                     album_obj = Album()
                     album_obj.band = band
                     album_split = album.split('-',2)
-                    album_obj.year = album_split[0]
-                    album_obj.title = album_split[1]
+                    album_obj.year = album_split[0].strip()
+                    album_obj.title = album_split[1].strip()
                     album_obj.path = os.path.join(AlbumManager._collection_root,band,album)
                     if band not in res_tree:
                         res_tree[band] = {}
                     res_tree[band][album] = album_obj
                 else:
                     logger.info('Album {album} of {band} is not following the format'.format(album=album, band=band))
+        #now let's check the database
+        albums_list = AlbumManager._musicdb.api_albums_get_albums()
+        if isinstance(albums_list, list):
+            for db_album in albums_list:
+                if db_album.band in res_tree:
+                    for key, album_obj in res_tree[db_album.band].items():
+                        if album_obj.title.casefold() == db_album.title.casefold():
+                            album_obj.merge(db_album)
+                            album_obj.in_db = True                          
         return res_tree
     
     @staticmethod
     def get_favorites(quantity, score):
-        #TODO: check why this is failing
+        """
+        Gets a list with random songs from the favorites list that complies with the required score.
+        :param quantity, the number of songs to return
+        :param score, the minimum score of the song 
+        """
         fav_songs = None
         result = AlbumManager._musicdb.api_songs_get_songs(quantity = quantity, score = score)
         if result:            
             if isinstance(result.songs, list):
+                albums_dict = AlbumManager.get_albums_from_collection()
                 for song in result.songs:
                     albums = AlbumManager._musicdb.api_albums_get_albums(album_id = song.disc_id)
                     if isinstance(albums, list):
                         if len(albums) == 1:
-                            #TODO: check if album is in music directory
-                            song.abs_path = None    
+                            album = albums[0]
+                            if album.band in albums_dict:
+                                #TODO: search for the song in the album path
+                                song.abs_path = album.path
                 fav_songs = result.song                    
                
         return fav_songs
                     
     
     @staticmethod
-    def get_album_list_for_band(band_name, country, style):
+    def get_album_list_for_band(band_name: str, country:str, style:str):
         '''
-        Gets the album list from a 
+        Gets the album list for the specified band name from the internet.
+        :param band_name the band name.
+        :param country the country of the band. Used for disambiguation.
+        :param style the style of the band. Used also for disambiguation.        
         '''
         musicbrainzngs.set_useragent("TODO: add name of app","1.0","TODO: add EMAIL from settings")
         bands_list = musicbrainzngs.search_artists(artist = band_name, type = "group", country = country)

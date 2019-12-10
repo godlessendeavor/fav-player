@@ -98,11 +98,21 @@ class GUI():
         self._left_frame = Frame(self._window_root)
         self._left_frame.pack(side=LEFT, padx=30, pady=30)
         
+        self._right_frame = Frame(self._window_root)
+        self._right_frame.pack(pady=30)
+        
+        self._top_right_frame = Frame(self._right_frame)
+        self._top_right_frame.pack()
+        
         self._top_left_frame = Frame(self._left_frame)
         self._top_left_frame.pack()
         
         self._bottom_left_frame = Frame(self._left_frame)
-        self._bottom_left_frame.pack()
+        self._bottom_left_frame.pack()       
+        
+        # Bottom Frame for volume, rewind, mute etc.
+        self._bottom_right_frame = Frame(self._right_frame)
+        self._bottom_right_frame.pack()
         
         #PLAYLIST
         
@@ -152,19 +162,13 @@ class GUI():
         
         ##ADD DELETE BUTTONS                 
         self.add_button = ttk.Button(self._bottom_left_frame, text="+ Add", command=self._browse_file)
-        self.add_button.pack(side=LEFT)
-
         self.delete_button = ttk.Button(self._bottom_left_frame, text="- Del", command=self._delete_song)
-        self.delete_button.pack(side=LEFT)
+
+        self.add_button.pack(side=LEFT)
+        self.delete_button.pack(side=RIGHT)
         
-        ##PLAY/STOP BUTTONS
-        
-        self._right_frame = Frame(self._window_root)
-        self._right_frame.pack(pady=30)
-        
-        self._top_right_frame = Frame(self._right_frame)
-        self._top_right_frame.pack()
-               
+        ##PLAY/STOP BUTTONS       
+            
         self._current_time_label = ttk.Label(self._top_right_frame, text='Current Time : --:--', relief=GROOVE)
         self._current_time_label.pack()
         
@@ -172,32 +176,25 @@ class GUI():
         self._middle_frame.pack(pady=30, padx=30)
         
         #images must be 50x50 pix since I couldn't find the way to resize them by code
-        self._play_photo = PhotoImage(file='images/play_small.png')
-        self._play_button = Button(self._middle_frame, image=self._play_photo, borderwidth=3, command=self._play_music)
-        self._play_button.image = self._play_photo
-        self._play_button.grid(row=0, column=0, padx=10)
+        self._play_photo   = PhotoImage(file='images/play_small.png')
+        self._stop_photo   = PhotoImage(file='images/stop_small.png')
+        self._pause_photo  = PhotoImage(file='images/pause_small.png')        
+        self._rewind_photo = PhotoImage(file='images/rewind_small.png')
+        self._mute_photo   = PhotoImage(file='images/mute_small.png')
+        self._volume_photo = PhotoImage(file='images/volume_small.png')
         
-        self._stop_photo = PhotoImage(file='images/stop_small.png')
-        self._stop_button = Button(self._middle_frame, image=self._stop_photo, borderwidth=3, command=self._stop_music)
-        self._stop_button.grid(row=0, column=1, padx=10)
-        
-        self._pause_photo = PhotoImage(file='images/pause_small.png')
-        self._pause_button = Button(self._middle_frame, image=self._pause_photo, borderwidth=3, command=self._pause_music)
+        self._play_button   = Button(self._middle_frame,       image=self._play_photo,   borderwidth=3, command=self._play_music)
+        self._stop_button   = Button(self._middle_frame,       image=self._stop_photo,   borderwidth=3, command=self._stop_music)
+        self._pause_button  = Button(self._middle_frame,       image=self._pause_photo,  borderwidth=3, command=self._pause_music)
+        self._rewind_button = Button(self._bottom_right_frame, image=self._rewind_photo, borderwidth=3, command=self._rewind_music)
+        self._volume_button = Button(self._bottom_right_frame, image=self._volume_photo, borderwidth=3, command=self._mute_music)
+ 
+        self._play_button.grid(row=0, column=0, padx=10)        
+        self._stop_button.grid(row=0, column=1, padx=10)        
         self._pause_button.grid(row=0, column=2, padx=10)
         
-        # Bottom Frame for volume, rewind, mute etc.
-        self._bottom_right_frame = Frame(self._right_frame)
-        self._bottom_right_frame.pack()
-        
-        self._rewind_photo = PhotoImage(file='images/rewind_small.png')
-        self._rewind_button = Button(self._bottom_right_frame, image=self._rewind_photo, borderwidth=3, command=self._rewind_music)
-        self._rewind_button.grid(row=0, column=0)
-        
-        self._mute_photo = PhotoImage(file='images/mute_small.png')
-        self._volume_photo = PhotoImage(file='images/volume_small.png')
-        self._volume_button = Button(self._bottom_right_frame, image=self._volume_photo, borderwidth=3, command=self._mute_music)
-        self._volume_button.grid(row=0, column=1)
-        
+        self._rewind_button.grid(row=0, column=0)        
+        self._volume_button.grid(row=0, column=1)        
         self._volume_scale = ttk.Scale(self._bottom_right_frame, from_=0, to=100, orient=HORIZONTAL, command=self._set_volume)
         self._volume_scale.grid(row=0, column=2, pady=15, padx=30)        
         
@@ -290,9 +287,11 @@ class GUI():
             try:
                 album = self._albums_list[selection]
             except KeyError:
-                #if selected row is a from the band root then we do not continue
+                #if selected row is from the band root then we do not continue
                 pass
             else:
+                #TODO: load image asynchronously and perhaps move this to another class
+                #That class should look for a cover art from musicbrainz if not found here
                 file_names = [f for f in listdir(album.path) if isfile(join(album.path, f))]
                 image = None
                 for file_name in file_names:
@@ -320,11 +319,7 @@ class GUI():
         self._album_workart_canvas_frame = self._album_workart_canvas.create_window((0,0),
                                                                      window=self._right_album_frame, 
                                                                      anchor = NW)
-        #TODO: get initial image!
-        #pil_image = PILImage.open("")
-        #pil_image = pil_image.resize((250, 250), PILImage.ANTIALIAS)
-        #self._current_album_img = ImageTk.PhotoImage(pil_image, master=self._albums_window)  
-        #self._album_workart_canvas.create_image(20, 20, anchor=NW, image=self._current_album_img) 
+
         
      
 
@@ -350,7 +345,9 @@ class GUI():
             logger.exception("Exception when calling PublicApi->api_songs_get_songs: %s\n" % e)
             
     def _show_album_list(self):
-        #TODO: replace splash window by loading cursor or similar
+        #TODO: replace splash window by loading cursor or similar        
+        #initialize the albums window layout        
+        self._init_albums_window_layout()
         splash = self.Splash(self._albums_window)
         album_dict = AlbumManager.get_albums_from_collection()     
         splash.destroy()      
@@ -493,7 +490,7 @@ class GUI():
                                                    album.country, 
                                                    album.type, 
                                                    album.score, 
-                                                   "NO"))
+                                                   album.in_db))
                 self._albums_list[album_id] = album
                 album_index += 1
         
