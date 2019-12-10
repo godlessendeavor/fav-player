@@ -186,7 +186,6 @@ definitions:
       style:        { type: string }
       year:         { type: string }
       country:      { type: string }
-      path:         { type: string }
       type:         { type: string }
       score:        { type: string }
       review:       { type: string }

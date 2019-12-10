@@ -29,9 +29,9 @@ class BaseModel(Model):
 class Album(BaseModel):
     id = AutoField(column_name='Id')
     copy = CharField(constraints=[SQL("DEFAULT ' '")])
-    group_name = CharField(column_name='groupName', constraints=[SQL("DEFAULT ' '")])
+    band = CharField(column_name='groupName', constraints=[SQL("DEFAULT ' '")])
     loc = CharField(constraints=[SQL("DEFAULT ' '")])
-    mark = CharField(constraints=[SQL("DEFAULT ' '")])
+    score = CharField(column_name='mark', constraints=[SQL("DEFAULT ' '")])
     review = TextField(null=True)
     style = CharField(constraints=[SQL("DEFAULT ' '")])
     title = CharField(constraints=[SQL("DEFAULT ' '")])
