@@ -53,19 +53,26 @@ class Favorites(BaseModel):
     class Meta:
         table_name = 'favorites'
 
+def database_mgmt(func):
+    def wrapper_do_open_close(*args, **kwargs):
+        database.connect() 
+        ret = func(*args, **kwargs)
+        database.close()
+        return ret
+    return wrapper_do_open_close
+
 
 class DatabaseProvider(object):
     
     fav_name_map = {'id': 'id', 'disc_id': 'disc_id', 'track_title': 'title', 'file_name': 'file_name', 'score': 'score', 'track_no': 'track_number', 'type': 'type'}
     
-    def __init__(self):
-        database.connect() 
-        
+    @database_mgmt       
     def _search_song_by_title_and_album_id(self, song_title, album_id):
         result = Favorites.select().where((Favorites.disc_id == album_id) & (Favorites.track_title == song_title))
         return [row for row  in result.dicts()]
     
-    def get_songs(self, quantity, score) -> str:
+    @database_mgmt
+    def get_songs(self, quantity, score):
         #get result from database as Peewee model
         result = Favorites.select().where(Favorites.score > score).order_by(fn.Rand()).limit(int(quantity))
         #get results from the query and map the key names to the app_definition response object names
@@ -73,6 +80,7 @@ class DatabaseProvider(object):
         logger.debug('Getting result for get_songs: %s', list_result)
         return {'songs' : list_result}
     
+    @database_mgmt
     def create_song(self, song) ->str:
         fav = Favorites()
         #first copy compulsory fields and validate types
@@ -108,9 +116,11 @@ class DatabaseProvider(object):
         fav.save()
         return song,200
     
+    @database_mgmt
     def update_song(self, song) ->str:
         return self.create_song(song)
     
+    @database_mgmt
     def delete_song(self, song_id) ->str:
         fav = Favorites.get(Favorites.id == song_id)
         try:
@@ -120,6 +130,7 @@ class DatabaseProvider(object):
             return 400
         return 200
     
+    @database_mgmt
     def get_albums(self, quantity, album_id) -> str:
         if album_id:
             result = Album.select().where(Album.id == album_id)          
@@ -134,6 +145,7 @@ class DatabaseProvider(object):
         else:
             return 400
     
+    @database_mgmt
     def create_album(self, album) ->str:
         #load the object and convert to album
         #TODO: could we use the next line to convert to object with attributes from json dict?
@@ -166,9 +178,11 @@ class DatabaseProvider(object):
             logger.warning('Exception on value when creating album', album) 
         return album,200
     
+    @database_mgmt
     def update_album(self, album) ->str:
         return self.create_album(album)
     
+    @database_mgmt
     def delete_album(self, album_id) ->str:
         album_entry = Album.get(Album.id == album_id)
         try:
