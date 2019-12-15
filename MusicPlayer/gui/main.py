@@ -280,7 +280,7 @@ class GUI():
             album = self._albums_list[row]            
             file_names = [f for f in listdir(album.path) if isfile(join(album.path, f))]
             for file_name in file_names:
-                self._add_to_playlist(os.path.join(album.path, file_name), album) 
+                self._add_file_to_playlist(os.path.join(album.path, file_name), album) 
             
         def do_cover_art_show(event):
             selection = self._album_listbox.identify_row(event.y)
@@ -330,7 +330,7 @@ class GUI():
         file_names = filedialog.askopenfilenames(parent=self._window_root, title="Choose files")
         self._window_root.tk.splitlist(file_names)
         for file_name in file_names:
-            self._add_to_playlist(file_name, None) 
+            self._add_file_to_playlist(file_name, None) 
             
     def _play_favs(self):        
         try:
@@ -340,7 +340,7 @@ class GUI():
             score = 5
             songs = AlbumManager.get_favorites(quantity, score)
             for song in songs:
-                self._add_to_playlist(song.abs_path, None) 
+                self._add_song_to_playlist(song) 
         except ApiException as e:
             logger.exception("Exception when calling PublicApi->api_songs_get_songs: %s\n" % e)
             
@@ -351,7 +351,6 @@ class GUI():
         splash = self.Splash(self._albums_window)
         album_dict = AlbumManager.get_albums_from_collection()     
         splash.destroy()      
-        self._init_albums_window_layout()
         self._add_to_album_list(album_dict)
         
 
@@ -446,12 +445,12 @@ class GUI():
         
     ######################### FUNCTION HELPERS #####################
     
-    def _add_to_playlist(self, path_name, album):
+    def _add_file_to_playlist(self, path_name, album):
         file_name = os.path.basename(path_name)
         song = Song()
         song.album = album
         try:
-            song.create_song_from_file(path_name)  
+            song.update_song_data_from_file(path_name)  
         except:
             logger.exception("Failed to add song to the playlist")
         else:            
@@ -464,6 +463,13 @@ class GUI():
                                      values=(file_name, song.title, song.band, album_title, song.total_length)) 
             #add song to playlist dictionary, the index is the index in the playlist 
             self._playlist[pl_index] = song
+            
+    def _add_song_to_playlist(self, song):
+        index = 1         
+        pl_index = self._playlistbox.insert("", index, text="Band Name", 
+                                     values=(song.file_name, song.title, song.band, song.album.title, song.total_length)) 
+        #add song to playlist dictionary, the index is the index in the playlist 
+        self._playlist[pl_index] = song
         
     def _add_to_album_list(self, album_dict):
         band_index = 1 

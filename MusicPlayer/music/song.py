@@ -25,12 +25,16 @@ class Song(DB_song):
     This is the model for songs in the Music Player
     '''
     
-    def __init__(self):
+    def __init__(self, song : DB_song = None):
         super().__init__()
-        self._album   = None
-        self._minutes = None
-        self._seconds = None
-        self._band    = None
+        self._album    = None
+        self._minutes  = None
+        self._seconds  = None
+        self._band     = None
+        self._abs_path = None
+        #Copy all attributes from base class object if provided
+        if song is not None:
+            self.__dict__.update(song.__dict__)
         
     @property
     def album(self):
@@ -62,14 +66,18 @@ class Song(DB_song):
     @property
     def abs_path(self):
         return self._abs_path
+    
+    @abs_path.setter
+    def abs_path(self, path):
+        self.update_song_data_from_file(path)
+        self._abs_path = path
 
     
-    def create_song_from_file(self, song_path):
+    def update_song_data_from_file(self, song_path):
         self._abs_path = song_path
         total_length = 0
         #get attributes
         file_data = os.path.splitext(song_path)
-        print(file_data)
     
         if file_data[1] == '.mp3':
             try:
@@ -101,6 +109,9 @@ class Song(DB_song):
                     logger.exception("Some exception occurred while reading MP3 tags.")
         else:
             raise Exception("File is not MP3.")
+        
+    #TODO: add __repr__ using the base class one plus the new attributes
+        
       
     
             

@@ -9,6 +9,7 @@ import dateutil.parser as date_parser
 import logging
 import re
 from music.album import Album
+from music.song import Song
 from config import config
 import musicbrainzngs
 import musicdb_client
@@ -90,7 +91,9 @@ class AlbumManager:
                     for key, album_obj in res_tree[db_album.band].items():
                         if album_obj.title.casefold() == db_album.title.casefold():
                             album_obj.merge(db_album)
-                            album_obj.in_db = True                          
+                            album_obj.in_db = True   
+                        #TODO: if it's not in database return a warning list as well
+            #TODO: return also another warning list if in database but not in collection                       
         return res_tree
     
     @staticmethod
@@ -100,21 +103,42 @@ class AlbumManager:
         :param quantity, the number of songs to return
         :param score, the minimum score of the song 
         """
-        fav_songs = None
+        fav_songs = []
+        #get a list from the database with the favorite songs
         result = AlbumManager._musicdb.api_songs_get_songs(quantity = quantity, score = score)
         if result:            
             if isinstance(result.songs, list):
+                #get albums from collection to search for this song
                 albums_dict = AlbumManager.get_albums_from_collection()
-                for song in result.songs:
-                    albums = AlbumManager._musicdb.api_albums_get_albums(album_id = song.disc_id)
-                    if isinstance(albums, list):
-                        if len(albums) == 1:
-                            album = albums[0]
-                            if album.band in albums_dict:
-                                #TODO: search for the song in the album path
-                                song.abs_path = album.path
-                fav_songs = result.song                    
-               
+                #for every song in the database result search the album info in the database
+                for db_song in result.songs:
+                    db_albums = AlbumManager._musicdb.api_albums_get_albums(album_id = db_song.disc_id)
+                    #make sure it's only one
+                    if isinstance(db_albums, list):
+                        if len(db_albums) == 1:
+                            db_album = db_albums[0]
+                            #if it's the same band then we continue, otherwise there might be a mistake
+                            if db_album.band in albums_dict:
+                                #now check for all albums for this band in the collection to that one with same database id
+                                for album_key, album in albums_dict[db_album.band].items():
+                                    if album.id == db_album.id:   
+                                        song = Song(db_song)    
+                                        song.album = album                  
+                                        #search for the song in the album path
+                                        for root, dirs, files in os.walk(album.path):
+                                            for file_name in files:
+                                                #TODO: change the next check for a check against the file_name
+                                                #right now it's not stored in the database but it should
+                                                #if file == song.file_name:                                                
+                                                #print(f"comparing {file_name} with {song.title}")
+                                                if song.title in file_name:
+                                                    song.abs_path = os.path.join(album.path, file_name)
+                                                    fav_songs.append(song)
+                                                    break
+                                            #TODO: if not found add to warning list
+                                        break          
+                                    #TODO: if not found add to warning list
+        #print(f"returning {fav_songs}")
         return fav_songs
                     
     
