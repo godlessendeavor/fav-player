@@ -108,7 +108,7 @@ class Song(DB_song):
                 except Exception:
                     logger.exception("Some exception occurred while reading MP3 tags.")
         else:
-            raise Exception("File is not MP3.")
+            raise Exception(f"File {song_path} is not MP3.")
         
     #TODO: add __repr__ using the base class one plus the new attributes
         

@@ -13,19 +13,24 @@ from music.song import Song
 from config import config
 import musicbrainzngs
 import musicdb_client
-from musicdb_client.rest import ApiException
 from musicdb_client.configuration import Configuration as Musicdb_config
 from builtins import staticmethod
 
 
-#set log configuration
-log_level = logging.getLevelName(config.LOGGING_LEVEL)
-
+#set logger configuration
 logging.basicConfig(
-    format='[%(asctime)-15s] [%(name)s] %(levelname)s]: %(message)s',
-    level=log_level
+    format=config.LOGGING_FORMAT,
+    level=config.LOGGING_LEVEL
 )
 logger = logging.getLogger(__name__)
+
+#set other logs config
+album_log_handler = logging.FileHandler(config.NON_COMPLIANT_ALBUMS_LOG)  
+songs_log_handler = logging.FileHandler(config.NON_COMPLIANT_SONGS_LOG)        
+album_log_handler.setFormatter(config.LOGGING_FORMAT)
+songs_log_handler.setFormatter(config.LOGGING_FORMAT)
+album_logger = logging.getLogger(__name__)   
+songs_logger = logging.getLogger(__name__)
 
 class AlbumManager:
     _collection_root = config.MUSIC_PATH    
@@ -55,7 +60,6 @@ class AlbumManager:
         return val
     
     #TODO: make async function using asyncio. Follow https://realpython.com/async-io-python/
-    #TODO: call the DB API and compare data
     @staticmethod  
     def get_albums_from_collection():
         '''
@@ -92,7 +96,9 @@ class AlbumManager:
                         if album_obj.title.casefold() == db_album.title.casefold():
                             album_obj.merge(db_album)
                             album_obj.in_db = True   
-                        #TODO: if it's not in database return a warning list as well
+                            break
+                    if not album_obj.in_db:
+                        album_logger.info(f'Album {album_obj.title} of band {album_obj.band} not found in database')
             #TODO: return also another warning list if in database but not in collection                       
         return res_tree
     
@@ -119,26 +125,36 @@ class AlbumManager:
                             db_album = db_albums[0]
                             #if it's the same band then we continue, otherwise there might be a mistake
                             if db_album.band in albums_dict:
+                                found_album = False
                                 #now check for all albums for this band in the collection to that one with same database id
                                 for album_key, album in albums_dict[db_album.band].items():
                                     if album.id == db_album.id:   
+                                        found_album = True
                                         song = Song(db_song)    
-                                        song.album = album                  
+                                        song.album = album     
+                                        found_song = False             
                                         #search for the song in the album path
                                         for root, dirs, files in os.walk(album.path):
                                             for file_name in files:
                                                 #TODO: change the next check for a check against the file_name
                                                 #right now it's not stored in the database but it should
-                                                #if file == song.file_name:                                                
-                                                #print(f"comparing {file_name} with {song.title}")
+                                                #if file == song.file_name:                                
                                                 if song.title in file_name:
+                                                    found_song = True
+                                                    #TODO: actually it should the dirs should be joined as well, for the reasons of albums with multiple cds
                                                     song.abs_path = os.path.join(album.path, file_name)
                                                     fav_songs.append(song)
                                                     break
-                                            #TODO: if not found add to warning list
-                                        break          
-                                    #TODO: if not found add to warning list
-        #print(f"returning {fav_songs}")
+                                            if not found_song:
+                                                songs_logger.info(f'Song with title {song.title} from album title \
+                                                                 {song.album.title} and band {song.album.band} not found among the \
+                                                                 files of the corresponding album')
+                                        break   
+                                if not found_album:
+                                    songs_logger.info(f"Album with database id {db_album.id} could not be found in database for song {db_song.title}")       
+                        else:
+                            logger.error(f'Found too many albums ({len(db_albums) }) with id {db_song.disc_i}')
+        #logger.debug(f"returning {fav_songs}")
         return fav_songs
                     
     

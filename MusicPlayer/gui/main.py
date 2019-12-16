@@ -23,11 +23,9 @@ from music.album_manager import AlbumManager
 from music.media_player import MyMediaPlayer
 
 #set log configuration
-log_level = logging.getLevelName(config.LOGGING_LEVEL)
-
 logging.basicConfig(
-    format='[%(asctime)-15s] [%(name)s] %(levelname)s]: %(message)s',
-    level=log_level
+    format=config.LOGGING_FORMAT,
+    level=config.LOGGING_LEVEL
 )
 logger = logging.getLogger(__name__)
 
