@@ -2,23 +2,15 @@ version: "3.1"
 services:
   web:
     image: musicdbserver
-    deploy:
-      replicas: 1
-      resources:
-        limits:
-          cpus: "0.1"
-          memory: 50M
-      restart_policy:
-        condition: on-failure
     ports:
       - "2020:2020"
     depends_on:
       - musicdb
     env_file:
       - musicdb.env
-    #volume bound to path in the host   
+    #volume bound to path in the host. Use :Z to share this volume (And preventing SELinux to complain about permissions)
     volumes:
-      - ${MUSIC_DB_CONFIG_VOL}:/config
+      - ${MUSIC_DB_CONFIG_VOL}:/app_config:Z
     networks:
       - webnet
       
