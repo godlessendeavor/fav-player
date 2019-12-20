@@ -345,12 +345,18 @@ class GUI():
             
     def _show_album_list(self):
         #TODO: replace splash window by loading cursor or similar        
-        #initialize the albums window layout        
-        self._init_albums_window_layout()
-        splash = self.Splash(self._albums_window)
-        album_dict = AlbumManager.get_albums_from_collection()     
+        #TODO: initialize the albums window layout after the call to the collection   
+        splash = self.Splash(self._window_root)
+        try:
+            album_dict = AlbumManager.get_albums_from_collection()    
+        except:
+            #TODO: show warning window
+            logger.exception("Exception when getting collection")
+        else:      
+            self._init_albums_window_layout()
+            self._add_to_album_list(album_dict)
         splash.destroy()      
-        self._add_to_album_list(album_dict)
+        
         
 
     ################### POP UP ACTIONS ######################################################

@@ -4,7 +4,7 @@
 <path>/${PROJECT_DIR_NAME}</path>
 </pydev_pathproperty>
 <pydev_property name="org.python.pydev.PYTHON_PROJECT_VERSION">python interpreter</pydev_property>
-<pydev_property name="org.python.pydev.PYTHON_PROJECT_INTERPRETER">python3</pydev_property>
+<pydev_property name="org.python.pydev.PYTHON_PROJECT_INTERPRETER">python</pydev_property>
 
 <pydev_pathproperty name="org.python.pydev.PROJECT_EXTERNAL_SOURCE_PATH">
 <path>/usr/local/lib/python3.6/dist-packages/musicdb_client-1.0.0-py3.6.egg</path>

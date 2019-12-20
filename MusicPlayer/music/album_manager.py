@@ -56,7 +56,11 @@ class AlbumManager:
             parent = reduce(dict.get, folders[:-1], dir_tree)
             parent[folders[-1]] = subdir
         #return the first value of the dictionary, we're not interested in the root name
-        key, val = next(iter( dir_tree.items()))
+        try:
+            key, val = next(iter( dir_tree.items()))
+        except Exception as ex:
+            logger.exception("Could not get Music directory tree")
+            raise(ex)            
         return val
     
     #TODO: make async function using asyncio. Follow https://realpython.com/async-io-python/
