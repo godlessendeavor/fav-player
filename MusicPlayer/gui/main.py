@@ -174,12 +174,13 @@ class GUI():
         self._middle_frame.pack(pady=30, padx=30)
         
         #images must be 50x50 pix since I couldn't find the way to resize them by code
-        self._play_photo   = PhotoImage(file='images/play_small.png')
-        self._stop_photo   = PhotoImage(file='images/stop_small.png')
-        self._pause_photo  = PhotoImage(file='images/pause_small.png')        
-        self._rewind_photo = PhotoImage(file='images/rewind_small.png')
-        self._mute_photo   = PhotoImage(file='images/mute_small.png')
-        self._volume_photo = PhotoImage(file='images/volume_small.png')
+        gui_root = os.path.dirname(__file__)
+        self._play_photo   = PhotoImage(file=os.path.join(gui_root, 'images/play_small.png'))
+        self._stop_photo   = PhotoImage(file=os.path.join(gui_root, 'images/stop_small.png'))
+        self._pause_photo  = PhotoImage(file=os.path.join(gui_root, 'images/pause_small.png'))        
+        self._rewind_photo = PhotoImage(file=os.path.join(gui_root, 'images/rewind_small.png'))
+        self._mute_photo   = PhotoImage(file=os.path.join(gui_root, 'images/mute_small.png'))
+        self._volume_photo = PhotoImage(file=os.path.join(gui_root, 'images/volume_small.png'))
         
         self._play_button   = Button(self._middle_frame,       image=self._play_photo,   borderwidth=3, command=self._play_music)
         self._stop_button   = Button(self._middle_frame,       image=self._stop_photo,   borderwidth=3, command=self._stop_music)
