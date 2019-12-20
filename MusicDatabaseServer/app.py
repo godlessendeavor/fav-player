@@ -8,6 +8,7 @@ import connexion
 from flask_injector import FlaskInjector
 from connexion.resolver import RestyResolver
 from providers.DatabaseProvider import DatabaseProvider
+from config import config
 
 from injector import Binder
 
@@ -26,5 +27,5 @@ if __name__ == '__main__':
         strict_validation=True)
     FlaskInjector(app=app.app, modules=[configure])
     #TODO: get port from config
-    app.run(port=2020, debug=True)
+    app.run(port=config.SERVER_PORT, debug=True)
     

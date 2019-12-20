@@ -23,5 +23,7 @@ DATABASE_NAME     = appconf['music_db']['DATABASE_NAME']
 DATABASE_USER     = appconf['music_db']['DATABASE_USER']
 DATABASE_PASSWORD = appconf['music_db']['DATABASE_PASSWORD']
 
+SERVER_PORT = appconf['server']['PORT']
+
 LOGGING_LEVEL = appconf['logging']['LOGGING_LEVEL']
 
