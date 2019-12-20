@@ -1,3 +1,5 @@
-#aiohttp 
-#aiofiles
+ttkthemes
 musicbrainzngs
+mutagen
+mp3_tagger
+python-vlc
