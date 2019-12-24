@@ -344,14 +344,13 @@ class GUI():
             logger.exception("Exception when calling PublicApi->api_songs_get_songs: %s\n" % e)
             
     def _show_album_list(self):
-        #TODO: replace splash window by loading cursor or similar        
-        #TODO: initialize the albums window layout after the call to the collection   
+        #TODO: replace splash window by loading cursor or similar         
         splash = self.Splash(self._window_root)
         try:
             album_dict = AlbumManager.get_albums_from_collection()    
         except:
-            #TODO: show warning window
             logger.exception("Exception when getting collection")
+            messagebox.showerror("Error", "Error getting collection. Please see logging")
         else:      
             self._init_albums_window_layout()
             self._add_to_album_list(album_dict)
