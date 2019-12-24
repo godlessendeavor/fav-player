@@ -1,9 +1,29 @@
 version: "3.1"
+
 services:
+  musicdb:
+    image: mysql:8.0.17
+    ports:
+      - 3306:3306
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_DATABASE: 'music_test'
+#TODO: change to env variables
+      MYSQL_USER: 'root'
+#     Password for root access
+      MYSQL_ROOT_PASSWORD: 'nevermore'
+#    Volumes where our data will be persisted
+    volumes:
+      - mysqldb:/var/lib/mysql
+    networks:
+      - webnet
+
+
   web:
     image: musicdbserver
     ports:
-      - "2020:2020"
+#TODO: change to env variables 
+      - 2020:2020
     depends_on:
       - musicdb
     env_file:
@@ -13,27 +33,11 @@ services:
       - ${MUSIC_DB_CONFIG_VOL}:/app_config:Z
     networks:
       - webnet
+    links:
+      - "musicdb:musicdb"
       
-  musicdb:
-     image: mysql:8.0.17
-     command: --default-authentication-plugin=mysql_native_password
-     environment:
-       MYSQL_DATABASE: 'music_test'
-       MYSQL_USER: 'root'
-#      Password for root access
-       MYSQL_ROOT_PASSWORD: 'nevermore'
-       port: 3306
-#    Volumes where our data will be persisted
-     volumes:
-       - mysqldb:/var/lib/mysql
-     networks:
-      - webnet
+
      
-# 
-#   dbadmin:    
-#     image: adminer    
-#     ports:      
-#       - "8181:8080"
 networks:
   webnet:  
 
