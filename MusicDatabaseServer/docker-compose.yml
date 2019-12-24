@@ -4,15 +4,15 @@ services:
   musicdb:
     image: mysql:8.0.17
     ports:
-#TODO: change to env variables 
-      - 3306:3306
+#TODO: change to env variable 
+      - "3306"
     command: --default-authentication-plugin=mysql_native_password
     environment:
       MYSQL_DATABASE: 'music_test'
       MYSQL_USER: 'root'
       MYSQL_ROOT_PASSWORD_FILE: /run/secrets/db_root_password
     volumes:
-      - mysqldb:/var/lib/mysql
+      - mysqldb:/var/lib/mysql:Z
     networks:
       - webnet
     secrets:
