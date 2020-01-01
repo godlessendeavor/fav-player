@@ -38,6 +38,6 @@ spec:
         hostPath:
           #type: Directory
           #TODO: get path from env variable
-          #remember to mount the host folder in minkube
-          path: /apps_config
+          #remember to mount the host folder in minikube
+          path: $MUSIC_DB_CONFIG_PATH
 status: {}
