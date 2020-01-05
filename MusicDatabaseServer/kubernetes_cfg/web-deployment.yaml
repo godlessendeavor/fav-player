@@ -25,6 +25,11 @@ spec:
             configMapKeyRef:
               key: MUSICDB_CONFIG_FILE
               name: web-musicdb-env
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: dbrootpassword
+              key: mysql-root-password 
         image: docker.io/godlessendeavor/musicdbserver
         name: web
         ports:
@@ -37,7 +42,6 @@ spec:
       - name: web-config-folder
         hostPath:
           #type: Directory
-          #TODO: get path from env variable
           #remember to mount the host folder in minikube
           path: $MUSIC_DB_CONFIG_PATH
 status: {}

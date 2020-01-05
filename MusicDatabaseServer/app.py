@@ -26,6 +26,5 @@ if __name__ == '__main__':
         arguments = {'title': 'DatabaseServer'},
         strict_validation=True)
     FlaskInjector(app=app.app, modules=[configure])
-    #TODO: get port from config
     app.run(port=config.SERVER_PORT, debug=True)
     

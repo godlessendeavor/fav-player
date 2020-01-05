@@ -1,12 +1,2 @@
-{
-  "music_db": {
-    "DATABASE_HOST": "localhost",
-    "DATABASE_NAME": "music_test",
-    "DATABASE_PORT": 3306,
-    "DATABASE_USER": "",
-    "DATABASE_PASSWORD": ""
-  },
-  "logging": {
-     "LOGGING_LEVEL": "DEBUG"
-  }
-}
+logging:
+  LOGGING_LEVEL: DEBUG
