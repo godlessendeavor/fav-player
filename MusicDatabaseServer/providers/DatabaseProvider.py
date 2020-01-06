@@ -11,6 +11,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+print(f"name is {config.DATABASE_NAME} host is {config.DATABASE_HOST} port is {config.DATABASE_PORT} user is {config.DATABASE_USER} password is {config.DATABASE_PASSWORD}")
 #set database configuration
 database = MySQLDatabase(config.DATABASE_NAME, 
                          **{'charset': 'utf8', 
@@ -53,6 +54,7 @@ class Favorites(BaseModel):
     class Meta:
         table_name = 'favorites'
 
+#function decorator for opening/closing the database. Useful for each method that requires access to the database
 def database_mgmt(func):
     def wrapper_do_open_close(*args, **kwargs):
         database.connect() 

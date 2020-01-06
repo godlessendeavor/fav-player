@@ -1,2 +1,6 @@
-logging:
-  LOGGING_LEVEL: DEBUG
+{
+ "logging": 
+  {
+  "LOGGING_LEVEL": "DEBUG"
+  }
+}

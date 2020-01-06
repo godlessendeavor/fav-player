@@ -18,12 +18,12 @@ dir_path = os.path.dirname(os.path.realpath(__file__))
 appconf = None
 try:
     appconf = json.load(open(os.environ.get("MUSICDB_CONFIG_FILE")))
-except KeyError:
+except Exception:
     appconf = json.load(open(os.path.join(dir_path, 'defaults/musicdb.conf.default')))
 
 # database config
 DATABASE_HOST     = os.environ.get('DATABASE_HOST')
-DATABASE_PORT     = os.environ.get('DATABASE_PORT')
+DATABASE_PORT     = int(os.environ.get('DATABASE_PORT'))
 DATABASE_NAME     = os.environ.get('DATABASE_NAME')
 DATABASE_USER     = os.environ.get('DATABASE_USER')
 DATABASE_PASSWORD = os.environ.get('DATABASE_PASSWORD')
