@@ -21,6 +21,7 @@ spec:
       restartPolicy: Always
       containers:
         - name: web
+          imagePullPolicy: Always
           image: docker.io/godlessendeavor/musicdbserver
           envFrom:
           - configMapRef:

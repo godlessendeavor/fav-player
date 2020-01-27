@@ -5,12 +5,10 @@ metadata:
     io.musicdb.service: web
   name: web
 spec:
-  type: NodePort
+  type: LoadBalancer
   ports:
   - name: "2020"
-    nodePort: 32020
     port: 2020
-    targetPort: 2020
   selector:
     io.musicdb.service: web
 status:

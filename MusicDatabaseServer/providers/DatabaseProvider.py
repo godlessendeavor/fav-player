@@ -193,5 +193,9 @@ class DatabaseProvider(object):
             logger.exception('Exception when deleting album')
             return 400
         return 200
+
+    #TODO: implement this in a different way or add behavior
+    def get(self):
+        return "OK",200
     
     
