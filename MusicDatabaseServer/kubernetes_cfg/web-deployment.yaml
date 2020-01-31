@@ -33,6 +33,5 @@ spec:
                  name: dbrootpassword
                  key: mysql-root-password         
           ports:
-          #TODO: read from env vars instead of hardcode it here
           - containerPort: 2020
 status: {}

@@ -3,7 +3,6 @@ resources:
   - musicdb-service.yaml
   - mysqldb-persistentvolumeclaim.yaml
   - web-deployment.yaml
-  - web-musicdb-env-configmap.yaml
   - webnet-networkpolicy.yaml
   - web-service.yaml
   - web-ingress.yaml
