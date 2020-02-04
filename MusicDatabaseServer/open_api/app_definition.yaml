@@ -10,11 +10,16 @@ info:
 
 schemes:
  - http
+ 
+security:
+ - oauth2: [] 
+ 
 paths:
   /:
       get:
         #TODO: implement this in a different way or add behavior here (like checking that database is running)
         summary: 'Rootpath get for supporting health check on GKE'
+        security: []
         tags:
         - public
         operationId: api.generic.get
@@ -45,7 +50,8 @@ paths:
               schema:
                  type: array
                  items:
-                    $ref: '#/definitions/album'   
+                    $ref: '#/definitions/album' 
+                    
       post:
          summary: Creates a new album.
          consumes:
@@ -179,13 +185,20 @@ paths:
            '200':
               description: OK       
 
-                
+
+securityDefinitions:
+  oauth2:
+    type: oauth2
+    flow: implicit
+    authorizationUrl: https://example.com/oauth2/dialog
+    x-tokenInfoFunc: app.token_info
+    scopes:
+      uid: Unique identifier of the user accessing the service.             
                 
 tags:
 - name: public
   description: Operations available to regular developers
-#- name: admins
-#  description: Secured Admin-only calls
+
 
 definitions:
   album:

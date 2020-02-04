@@ -17,14 +17,31 @@ def configure(binder: Binder) -> Binder:
         DatabaseProvider
     )
 
+# our hardcoded mock "Bearer" access tokens
+# TODO: change to read from env var
+TOKENS = {
+    '666': 'music_player',
+}
 
-if __name__ == '__main__':
-    app = connexion.App(__name__, specification_dir='open_api/')  # Provide the app and the directory of the docs
-    app.add_api(
+def token_info(access_token) -> dict:
+    uid = TOKENS.get(access_token)
+    if not uid:
+        return None
+    return {'uid': uid, 'scope': ['uid']}
+
+def create_app():
+    conn_app = connexion.App(__name__, specification_dir='open_api/')  # Provide the app and the directory of the docs
+    conn_app.add_api(
         'app_definition.yaml', 
-        resolver  = RestyResolver('api'), #TODO: change api to music and remove the operationId from the API definitions and 'music' from the path resolutions
+        resolver  = RestyResolver('api'),
         arguments = {'title': 'DatabaseServer'},
         strict_validation=True)
-    FlaskInjector(app=app.app, modules=[configure])
+    FlaskInjector(app=conn_app.app, modules=[configure])
+    return conn_app
+
+
+if __name__ == '__main__':
+    app = create_app()
     app.run(port=config.SERVER_PORT, debug=True)
+
     

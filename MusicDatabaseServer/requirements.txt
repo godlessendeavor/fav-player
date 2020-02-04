@@ -1,5 +1,5 @@
 Flask
-connexion
+connexion==2.4.0
 connexion[swagger-ui]
 Flask-Injector
 injector==0.17.0
