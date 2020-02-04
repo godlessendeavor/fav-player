@@ -50,6 +50,7 @@ class AlbumManager:
         dir_tree = {}
         rootdir = AlbumManager._collection_root.rstrip(os.sep)
         start = rootdir.rfind(os.sep) + 1
+        logger.debug('Drive path is %s', rootdir)
         for path, dirs, files in os.walk(rootdir):
             folders = path[start:].split(os.sep)
             subdir = dict.fromkeys(files)

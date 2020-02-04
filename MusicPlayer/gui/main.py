@@ -14,7 +14,6 @@ from os.path import isfile, join
 
 import musicdb_client
 from musicdb_client.rest import ApiException
-from musicdb_client.configuration import Configuration as Musicdb_config
 
 from config import config
 from music.song import Song
@@ -49,10 +48,8 @@ class GUI():
         self._music_path = config.MUSIC_PATH
         self._details_thread = threading.Thread(target=self._start_count, args =(lambda : self._stop_details_thread, ))
         self._stop_details_thread = False
-        self._musicdb_config = Musicdb_config()
-        self._musicdb_config.host = config.MUSIC_DB_HOST
-        self._musicdb_config.debug = True
-        self._musicdb = musicdb_client.PublicApi(musicdb_client.ApiClient(self._musicdb_config))
+        #configure the client to access the music_db server
+        self._musicdb = musicdb_client.PublicApi(musicdb_client.ApiClient(config.get_musicdb_client_config(logger)))
         #always initialize layout at the end because it contains the gui main loop
         self._init_main_window_layout() 
 
