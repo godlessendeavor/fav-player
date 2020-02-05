@@ -33,11 +33,9 @@ album_logger = logging.getLogger(__name__)
 songs_logger = logging.getLogger(__name__)
 
 class AlbumManager:
-    _collection_root = config.MUSIC_PATH    
-    _musicdb_config = Musicdb_config()
-    _musicdb_config.host = config.MUSIC_DB_HOST
-    _musicdb_config.debug = True
-    _musicdb = musicdb_client.PublicApi(musicdb_client.ApiClient(_musicdb_config))
+    _collection_root = config.MUSIC_PATH  
+    #TODO: initialize the api from a central place, otherwise we might have two different initializations 
+    _musicdb = musicdb_client.PublicApi(musicdb_client.ApiClient(config.get_musicdb_client_config(logger)))
     
     #TODO: consider caching for this: lru_cache vs CacheTools?
     @staticmethod  

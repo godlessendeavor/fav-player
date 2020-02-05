@@ -22,6 +22,7 @@ from music.album_manager import AlbumManager
 from music.media_player import MyMediaPlayer
 
 #set log configuration
+#TODO: do it in the config module
 logging.basicConfig(
     format=config.LOGGING_FORMAT,
     level=config.LOGGING_LEVEL

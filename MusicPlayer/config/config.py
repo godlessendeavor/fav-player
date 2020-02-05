@@ -42,5 +42,4 @@ def get_musicdb_client_config(logger):
         _musicdb_config.debug = True
     _musicdb_config.access_token = MUSIC_DB_TOKEN
     _musicdb_config.logger_file_handler = logger
-    print(_musicdb_config.auth_settings())
     return _musicdb_config
