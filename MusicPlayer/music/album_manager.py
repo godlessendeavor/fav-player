@@ -13,16 +13,7 @@ from music.song import Song
 from config import config
 import musicbrainzngs
 import musicdb_client
-from musicdb_client.configuration import Configuration as Musicdb_config
 from builtins import staticmethod
-
-
-#set logger configuration
-logging.basicConfig(
-    format=config.LOGGING_FORMAT,
-    level=config.LOGGING_LEVEL
-)
-logger = logging.getLogger(__name__)
 
 #set other logs config
 album_log_handler = logging.FileHandler(config.NON_COMPLIANT_ALBUMS_LOG)  
@@ -35,7 +26,7 @@ songs_logger = logging.getLogger(__name__)
 class AlbumManager:
     _collection_root = config.MUSIC_PATH  
     #TODO: initialize the api from a central place, otherwise we might have two different initializations 
-    _musicdb = musicdb_client.PublicApi(musicdb_client.ApiClient(config.get_musicdb_client_config(logger)))
+    _musicdb = config._musicdb_api
     
     #TODO: consider caching for this: lru_cache vs CacheTools?
     @staticmethod  
@@ -48,7 +39,7 @@ class AlbumManager:
         dir_tree = {}
         rootdir = AlbumManager._collection_root.rstrip(os.sep)
         start = rootdir.rfind(os.sep) + 1
-        logger.debug('Drive path is %s', rootdir)
+        config.logger.debug('Drive path is %s', rootdir)
         for path, dirs, files in os.walk(rootdir):
             folders = path[start:].split(os.sep)
             subdir = dict.fromkeys(files)
@@ -58,7 +49,7 @@ class AlbumManager:
         try:
             key, val = next(iter( dir_tree.items()))
         except Exception as ex:
-            logger.exception("Could not get Music directory tree")
+            config.logger.exception("Could not get Music directory tree")
             raise(ex)            
         return val
     
@@ -89,7 +80,7 @@ class AlbumManager:
                         res_tree[band] = {}
                     res_tree[band][album] = album_obj
                 else:
-                    logger.info('Album {album} of {band} is not following the format'.format(album=album, band=band))
+                    config.logger.info('Album {album} of {band} is not following the format'.format(album=album, band=band))
         #now let's check the database
         albums_list = AlbumManager._musicdb.api_albums_get_albums()
         if isinstance(albums_list, list):
@@ -156,13 +147,13 @@ class AlbumManager:
                                 if not found_album:
                                     songs_logger.info(f"Album with database id {db_album.id} could not be found in database for song {db_song.title}")       
                         else:
-                            logger.error(f'Found too many albums ({len(db_albums) }) with id {db_song.disc_i}')
+                            config.logger.error(f'Found too many albums ({len(db_albums) }) with id {db_song.disc_i}')
         #logger.debug(f"returning {fav_songs}")
         return fav_songs
                     
     
     @staticmethod
-    def get_album_list_for_band(band_name: str, country:str, style:str):
+    def get_album_list_for_band(band_name: str, country: str, style: str):
         '''
         Gets the album list for the specified band name from the internet.
         :param band_name the band name.
@@ -201,7 +192,7 @@ class AlbumManager:
                 try:
                     year = date_parser.parse(date).year
                 except ValueError:
-                    logger.exception(f"Date {date} could not be parsed")
+                    config.logger.exception(f"Date {date} could not be parsed")
                     #TODO: reraise?
                 album_year_list.append((release["title"], year))
             

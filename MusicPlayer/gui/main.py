@@ -1,18 +1,16 @@
 import os
 import threading
 import time
-import traceback
+
 import tkinter.messagebox
 from tkinter import *
 #from tkinter import filedialog
 from tkinter import ttk
 from ttkthemes import themed_tk as tk
 from PIL import ImageTk, Image as PILImage
-import logging
 from os import listdir
 from os.path import isfile, join
 
-import musicdb_client
 from musicdb_client.rest import ApiException
 
 from config import config
@@ -21,13 +19,6 @@ from music.album import Album
 from music.album_manager import AlbumManager
 from music.media_player import MyMediaPlayer
 
-#set log configuration
-#TODO: do it in the config module
-logging.basicConfig(
-    format=config.LOGGING_FORMAT,
-    level=config.LOGGING_LEVEL
-)
-logger = logging.getLogger(__name__)
 
 class GUI():
     
@@ -45,12 +36,10 @@ class GUI():
         self._muted  = FALSE
         self._playlist = {}   #dictionary containing the song objects of the playlist  
         self._albums_list = {} #dictionary containing the album objects for the album list
-        self._config_reader = config
-        self._music_path = config.MUSIC_PATH
         self._details_thread = threading.Thread(target=self._start_count, args =(lambda : self._stop_details_thread, ))
         self._stop_details_thread = False
-        #configure the client to access the music_db server
-        self._musicdb = musicdb_client.PublicApi(musicdb_client.ApiClient(config.get_musicdb_client_config(logger)))
+        #get the client to access the music_db server
+        self._musicdb = config._musicdb_api
         #always initialize layout at the end because it contains the gui main loop
         self._init_main_window_layout() 
 
@@ -339,7 +328,7 @@ class GUI():
             for song in songs:
                 self._add_song_to_playlist(song) 
         except ApiException as e:
-            logger.exception("Exception when calling PublicApi->api_songs_get_songs: %s\n" % e)
+            config.logger.exception("Exception when calling PublicApi->api_songs_get_songs: %s\n" % e)
             
     def _show_album_list(self):
         #TODO: replace splash window by loading cursor or similar         
@@ -347,7 +336,7 @@ class GUI():
         try:
             album_dict = AlbumManager.get_albums_from_collection()    
         except:
-            logger.exception("Exception when getting collection")
+            config.logger.exception("Exception when getting collection")
             messagebox.showerror("Error", "Error getting collection. Please see logging")
         else:      
             self._init_albums_window_layout()
@@ -391,7 +380,7 @@ class GUI():
          
                 self._player.play_list(file_list)
             except Exception as ex:
-                logger.exception('Exception while playing music: ' + str(ex)) 
+                config.logger.exception('Exception while playing music: ' + str(ex)) 
                 tkinter.messagebox.showerror('File not found', 'Player could not find the file. Please check again.')
 
     def _stop_music(self):        
@@ -454,7 +443,7 @@ class GUI():
         try:
             song.update_song_data_from_file(path_name)  
         except:
-            logger.exception("Failed to add song to the playlist")
+            config.logger.exception("Failed to add song to the playlist")
         else:            
             index = 1         
             if album:

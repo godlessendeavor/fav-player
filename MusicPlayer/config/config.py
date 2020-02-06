@@ -10,7 +10,8 @@ Created on Aug 12, 2019
 import json
 import os
 import logging
-from musicdb_client.configuration import Configuration as Musicdb_config
+
+import musicdb_client
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
@@ -34,12 +35,20 @@ NON_COMPLIANT_SONGS_LOG = mpconf['non_compliances_log']['SONGS']
 LOGGING_FORMAT = '[%(asctime)-15s] [%(name)s] %(levelname)s]: %(message)s'
 LOGGING_LEVEL = logging.getLevelName(LOGGING_LEVEL_NAME)
 
+logging.basicConfig(
+    format=LOGGING_FORMAT,
+    level=LOGGING_LEVEL
+)
+logger = logging.getLogger(__name__)
 
-def get_musicdb_client_config(logger):    
-    _musicdb_config = Musicdb_config()
-    _musicdb_config.host = MUSIC_DB_HOST
-    if LOGGING_LEVEL == logging.DEBUG:
-        _musicdb_config.debug = True
-    _musicdb_config.access_token = MUSIC_DB_TOKEN
-    _musicdb_config.logger_file_handler = logger
-    return _musicdb_config
+#configure the musicdb client api
+_musicdb_config = musicdb_client.Configuration()
+_musicdb_config.host = MUSIC_DB_HOST
+if LOGGING_LEVEL == logging.DEBUG:
+    _musicdb_config.debug = True
+_musicdb_config.access_token = MUSIC_DB_TOKEN
+_musicdb_config.logger_file_handler = logger
+
+_musicdb_api = musicdb_client.PublicApi(musicdb_client.ApiClient(_musicdb_config))
+                                        
+                                        
