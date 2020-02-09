@@ -28,6 +28,8 @@ DATABASE_NAME     = os.environ.get('DATABASE_NAME')
 DATABASE_USER     = os.environ.get('DATABASE_USER')
 DATABASE_PASSWORD = os.environ.get('DATABASE_PASSWORD')
 
+ACCESS_TOKEN      = os.environ.get('ACCESS_TOKEN')
+
 SERVER_PORT = int(os.environ.get('APP_PORT'))
 
 LOGGING_LEVEL = appconf['logging']['LOGGING_LEVEL']

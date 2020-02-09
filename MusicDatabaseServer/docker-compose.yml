@@ -15,13 +15,13 @@ services:
     networks:
       - webnet
     secrets:
-       - db_root_password
+      - db_root_password
 
 
   web:
     env_file:
       - ${MUSIC_DB_ENV_FILE}
-    image: musicdbserver
+    image: godlessendeavor/musicdbserver
     ports:
       - ${APP_PORT}:${APP_PORT}
     depends_on:

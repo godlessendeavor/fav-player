@@ -18,9 +18,8 @@ def configure(binder: Binder) -> Binder:
     )
 
 # our hardcoded mock "Bearer" access tokens
-# TODO: change to read from env var
 TOKENS = {
-    '666': 'music_player',
+    config.ACCESS_TOKEN: 'music_player',
 }
 
 def token_info(access_token) -> dict:

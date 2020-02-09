@@ -10,5 +10,4 @@ spec:
       paths:
       - backend:
           serviceName: web
-          #TODO: read from env vars instead of hardcode it here
           servicePort: 2020
