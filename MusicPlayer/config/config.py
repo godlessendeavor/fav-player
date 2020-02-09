@@ -26,7 +26,7 @@ except KeyError:
 LOGGING_LEVEL_NAME = mpconf['logging']['LOGGING_LEVEL']
 MUSIC_PATH = mpconf['music_player']['MUSIC_PATH']
 MUSIC_DB_HOST = mpconf['music_db']['HOST']    
-MUSIC_DB_TOKEN = '666' # TODO: add from config
+MUSIC_DB_TOKEN = mpconf['music_db']['ACCESS_TOKEN'] 
 
 # non-compliances files
 NON_COMPLIANT_ALBUMS_LOG = mpconf['non_compliances_log']['ALBUMS']  
