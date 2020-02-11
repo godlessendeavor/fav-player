@@ -1,12 +1,12 @@
 from vlc import MediaPlayer, MediaListPlayer, MediaList
 
-import config
+from config import config
 
 #Function to check if attribute _media exists
 def check_media(func):
     def inner(self, *args, **kwargs):
         if self._media is None:
-            config.logger.error("Can't call Media Player without setting a file or a file list first")
+            config.logger.warning("Can't call Media Player without setting a file or a file list first")
             #TODO: raise exception or print error?
             #raise ValueError
         else:
@@ -18,11 +18,13 @@ class MyMediaPlayer(object):
     """
     def __init__(self):
         self._media = None
-        
+    
+    @check_media     
     def play(self, fname):
         self._media = MediaPlayer(fname)
         self._media.play()
     
+    @check_media 
     def play_list(self, flist):
         mlp = MediaListPlayer()
         self._media = MediaPlayer()
