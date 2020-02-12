@@ -1,0 +1,13 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: web-ingress
+  #TODO: create namespace
+  #namespace: musicdb
+spec:
+  rules:
+  - http:
+      paths:
+      - backend:
+          serviceName: web
+          servicePort: 2020

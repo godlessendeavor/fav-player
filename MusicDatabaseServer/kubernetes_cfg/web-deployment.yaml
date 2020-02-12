@@ -3,6 +3,7 @@ kind: Deployment
 metadata:
   labels:
     io.musicdb.service: web
+  #TODO:change name to musicdb-web. Apply changes to web-ingress and other places as well.
   name: web
 spec:
   replicas: 1
@@ -19,25 +20,18 @@ spec:
     spec:
       restartPolicy: Always
       containers:
-      - env:
-        - name: MUSICDB_CONFIG_FILE
-          valueFrom:
-            configMapKeyRef:
-              key: MUSICDB_CONFIG_FILE
-              name: web-musicdb-env
-        image: docker.io/godlessendeavor/musicdbserver
-        name: web
-        ports:
-        - containerPort: 2020
-        resources: {}
-        volumeMounts:
-        - mountPath: /app_config
-          name: web-config-folder
-      volumes:
-      - name: web-config-folder
-        hostPath:
-          #type: Directory
-          #TODO: get path from env variable
-          #remember to mount the host folder in minkube
-          path: /apps_config
+        - name: web
+          imagePullPolicy: Always
+          image: docker.io/godlessendeavor/musicdbserver
+          envFrom:
+          - configMapRef:
+              name: musicdb-config
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+               secretKeyRef:
+                 name: dbrootpassword
+                 key: mysql-root-password         
+          ports:
+          - containerPort: 2020
 status: {}

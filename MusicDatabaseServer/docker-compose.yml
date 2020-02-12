@@ -4,29 +4,28 @@ services:
   musicdb:
     image: mysql:8.0.17
     ports:
-#TODO: change to env variable 
-      - "3306"
+      - "${DATABASE_PORT}"
     command: --default-authentication-plugin=mysql_native_password
     environment:
-      MYSQL_DATABASE: 'music_test'
-      MYSQL_USER: 'root'
       MYSQL_ROOT_PASSWORD_FILE: /run/secrets/db_root_password
+    env_file:
+      - ${MUSIC_DB_ENV_FILE}
     volumes:
       - mysqldb:/var/lib/mysql:Z
     networks:
       - webnet
     secrets:
-       - db_root_password
+      - db_root_password
 
 
   web:
-    image: musicdbserver
+    env_file:
+      - ${MUSIC_DB_ENV_FILE}
+    image: godlessendeavor/musicdbserver
     ports:
-      - 2020:2020
+      - ${APP_PORT}:${APP_PORT}
     depends_on:
       - musicdb
-    env_file:
-      - musicdb.env
     #volume bound to path in the host. Use :Z to share this volume (And preventing SELinux to complain about permissions)
     volumes:
       - ${MUSIC_DB_CONFIG_VOL}:/app_config:Z

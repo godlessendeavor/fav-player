@@ -22,7 +22,7 @@ spec:
         - --default-authentication-plugin=mysql_native_password
         env:
         - name: MYSQL_DATABASE
-          value: music_test
+          value: music
         - name: MYSQL_ROOT_PASSWORD
           valueFrom:
             secretKeyRef:

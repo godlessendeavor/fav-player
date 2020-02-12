@@ -53,6 +53,7 @@ class Favorites(BaseModel):
     class Meta:
         table_name = 'favorites'
 
+#function decorator for opening/closing the database. Useful for each method that requires access to the database
 def database_mgmt(func):
     def wrapper_do_open_close(*args, **kwargs):
         database.connect() 
@@ -92,10 +93,10 @@ class DatabaseProvider(object):
             fav.file_name = song['file_name']
         except KeyError:
             logger.exception('Exception on key when creating favorite song')
-            return 400
+            return song, 400
         except ValueError:
             logger.exception('Exception on value when creating favorite song')
-            return 400
+            return song, 400
         #now copy optional fields
         try:
             fav.type = song['type']            
@@ -127,8 +128,8 @@ class DatabaseProvider(object):
             fav.delete_instance()
         except Exception as ex:
             logger.error('Exception when deleting favorite song: '+str(ex))
-            return 400
-        return 200
+            return song_id, 400
+        return song_id, 200
     
     @database_mgmt
     def get_albums(self, quantity, album_id) -> str:
@@ -143,7 +144,7 @@ class DatabaseProvider(object):
             logger.debug('Getting result for get_songs: %s', list_result) 
             return list_result,200
         else:
-            return 400
+            return album_id, 400
     
     @database_mgmt
     def create_album(self, album) ->str:
@@ -160,10 +161,10 @@ class DatabaseProvider(object):
             album_entry.year       = int(album['year'])
         except KeyError:
             logger.exception('Exception on key when creating album')
-            return 400
+            return album, 400
         except ValueError:
             logger.exception('Exception on value when creating album')
-            return 400
+            return album, 400
         #now copy optional fields
         try:
             album_entry.mark     = float(album['score'])   
@@ -176,7 +177,7 @@ class DatabaseProvider(object):
             logger.warning('Type was not provided for album: ', album)  
         except ValueError:
             logger.warning('Exception on value when creating album', album) 
-        return album,200
+        return album, 200
     
     @database_mgmt
     def update_album(self, album) ->str:
@@ -189,7 +190,11 @@ class DatabaseProvider(object):
             album_entry.delete_instance()
         except Exception:
             logger.exception('Exception when deleting album')
-            return 400
-        return 200
+            return album_id, 400
+        return album_id, 200
+
+    #TODO: implement this in a different way or add behavior (like checking connection to database)
+    def get(self):
+        return "OK",200
     
     
