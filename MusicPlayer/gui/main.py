@@ -36,6 +36,7 @@ class GUI():
         self._muted  = FALSE
         self._playlist = {}   #dictionary containing the song objects of the playlist  
         self._albums_list = {} #dictionary containing the album objects for the album list
+        self._albums_from_server = {} #preliminary dictionary containing the data from the server, to be processed to _albums_list
         self._details_thread = threading.Thread(target=self._start_count, args =(lambda : self._stop_details_thread, ))
         self._stop_details_thread = False
         #get the client to access the music_db server
@@ -78,8 +79,7 @@ class GUI():
         self._menubar.add_cascade(label="Play", menu=self._play_sub_menu)
         self._play_sub_menu.add_command(label="Favorites random", command=self._play_favs)
               
-        #FRAMES STRUCTURE
-        
+        #FRAMES STRUCTURE        
         self._left_frame = Frame(self._window_root)
         self._left_frame.pack(side=LEFT, padx=30, pady=30)
         
@@ -152,13 +152,12 @@ class GUI():
         self.add_button.pack(side=LEFT)
         self.delete_button.pack(side=RIGHT)
         
-        ##PLAY/STOP BUTTONS       
-            
+        ##PLAY/STOP BUTTONS         
         self._current_time_label = ttk.Label(self._top_right_frame, text='Current Time : --:--', relief=GROOVE)
         self._current_time_label.pack()
         
-        self._middle_frame = Frame(self._right_frame)
-        self._middle_frame.pack(pady=30, padx=30)
+        self._middle_right_frame = Frame(self._right_frame)
+        self._middle_right_frame.pack(pady=30, padx=30)
         
         #images must be 50x50 pix since I couldn't find the way to resize them by code
         gui_root = os.path.dirname(__file__)
@@ -169,9 +168,9 @@ class GUI():
         self._mute_photo   = PhotoImage(file=os.path.join(gui_root, 'images/mute_small.png'))
         self._volume_photo = PhotoImage(file=os.path.join(gui_root, 'images/volume_small.png'))
         
-        self._play_button   = Button(self._middle_frame,       image=self._play_photo,   borderwidth=3, command=self._play_music)
-        self._stop_button   = Button(self._middle_frame,       image=self._stop_photo,   borderwidth=3, command=self._stop_music)
-        self._pause_button  = Button(self._middle_frame,       image=self._pause_photo,  borderwidth=3, command=self._pause_music)
+        self._play_button   = Button(self._middle_right_frame,       image=self._play_photo,   borderwidth=3, command=self._play_music)
+        self._stop_button   = Button(self._middle_right_frame,       image=self._stop_photo,   borderwidth=3, command=self._stop_music)
+        self._pause_button  = Button(self._middle_right_frame,       image=self._pause_photo,  borderwidth=3, command=self._pause_music)
         self._rewind_button = Button(self._bottom_right_frame, image=self._rewind_photo, borderwidth=3, command=self._rewind_music)
         self._volume_button = Button(self._bottom_right_frame, image=self._volume_photo, borderwidth=3, command=self._mute_music)
  
@@ -182,7 +181,10 @@ class GUI():
         self._rewind_button.grid(row=0, column=0)        
         self._volume_button.grid(row=0, column=1)        
         self._volume_scale = ttk.Scale(self._bottom_right_frame, from_=0, to=100, orient=HORIZONTAL, command=self._set_volume)
-        self._volume_scale.grid(row=0, column=2, pady=15, padx=30)        
+        self._volume_scale.grid(row=0, column=2, pady=15, padx=30)     
+        
+        self._progressbar = ttk.Progressbar(self._middle_right_frame, mode='indeterminate')
+        self._progressbar.grid(row=1, column=1, sticky=W, pady=15)   
         
         #start the gui loop
         self._window_root.mainloop()
@@ -214,8 +216,7 @@ class GUI():
         self._bottom_album_frame = Frame(self._albums_window)
         self._bottom_album_frame.pack(side=BOTTOM)
         
-        #ALBUM LIST
-        
+        #ALBUM LIST        
         vscrollbar = Scrollbar(self._left_album_frame, orient="vertical")
         hscrollbar = Scrollbar(self._left_album_frame, orient="horizontal")
         
@@ -311,12 +312,17 @@ class GUI():
 
         
     ################### MENU ACTIONS ######################################################
+    ################### MENU ACTIONS ######################################################
+    ################### MENU ACTIONS ######################################################
+    ################### MENU ACTIONS ######################################################
 
     def _browse_file(self):
         file_names = filedialog.askopenfilenames(parent=self._window_root, title="Choose files")
         self._window_root.tk.splitlist(file_names)
         for file_name in file_names:
             self._add_file_to_playlist(file_name, None) 
+            
+    ###################### GET THE FAVORITE SONGS ###########################
             
     def _play_favs(self):        
         try:
@@ -327,30 +333,54 @@ class GUI():
             songs = AlbumManager.get_favorites(quantity, score)
             for song in songs:
                 self._add_song_to_playlist(song) 
-        except ApiException as e:
-            config.logger.exception("Exception when calling PublicApi->api_songs_get_songs: %s\n" % e)
+        except ApiException:
+            config.logger.exception("Exception when calling PublicApi->api_songs_get_songs")
+            
+            
+    ####################### GET THE ALBUM LIST ##################################
             
     def _show_album_list(self):
-        #TODO: replace splash window by loading cursor or similar         
-        splash = self.Splash(self._window_root)
+        """Function to get the album list to present in a new window
+        It will start a new thread to get the information from the server and a progressbar to indicate progress
+        Progress update is checked in _check_album_list_thread
+        Thread work is in _show_album_list_thread"""
+        self._album_collection_thread = threading.Thread(target=self._show_album_list_thread)
+        self._album_collection_thread.daemon = True
+        self._progressbar.start()
+        self._album_collection_thread.start()
+        self._window_root.after(100, self._check_album_list_thread)
+        
+   
+    def _check_album_list_thread(self):
+        """Function to check progress of album list retrieve. It updates a progress bar while working.
+         Once it is done it creates a new window with the results"""
+        self._window_root.update()
+        if self._album_collection_thread.is_alive():
+            self._window_root.after(100, self._check_album_list_thread)
+        else:
+            self._progressbar.stop()
+            #show the results once we received them
+            if self._albums_from_server:
+                self._init_albums_window_layout()
+                self._add_to_album_list(self._albums_from_server)
+            else:                
+                messagebox.showerror("Error", "Error getting album collection. Please check logging.")
+        
+        
+    def _show_album_list_thread(self):
+        """Function to get the album list. Since it's time consuming it should be called in a separate thread."""
         try:
-            album_dict = AlbumManager.get_albums_from_collection()    
+            self._albums_from_server = AlbumManager.get_albums_from_collection() 
         except:
-            config.logger.exception("Exception when getting collection")
-            messagebox.showerror("Error", "Error getting collection. Please see logging")
-        else:      
-            self._init_albums_window_layout()
-            self._add_to_album_list(album_dict)
-        splash.destroy()      
-        
-        
+            config.logger.exception("Exception when getting album collection")
+            
+   
 
     ################### POP UP ACTIONS ######################################################
     
     ############### MAIN PLAYER #############
 
     def _playlistbox_add_to_favorites(self):
-        #TODO: add command functionality and remove print
         song = self._playlist[self._playlist_popup.selection] 
         self._musicdb.api_songs_update_song(song)
         
@@ -379,8 +409,8 @@ class GUI():
                         file_list = [song.abs_path for song in self._playlist.values()]
          
                 self._player.play_list(file_list)
-            except Exception as ex:
-                config.logger.exception('Exception while playing music: ' + str(ex)) 
+            except Exception:
+                config.logger.exception('Exception while playing music') 
                 tkinter.messagebox.showerror('File not found', 'Player could not find the file. Please check again.')
 
     def _stop_music(self):        
@@ -474,11 +504,11 @@ class GUI():
                                                    "", 
                                                    "", 
                                                    ""))
-            #print(band, band_root)
+            config.logger.debug(f"Adding band {band} from {band_root}")
             band_index += 1            
             album_index = 1 
             for album_key, album in albums.items():
-                #print(album)                
+                config.logger.debug(f"Adding album {album} to band {band}")                
                 album_id = self._album_listbox.insert(band_root, album_index, 
                                            values=("", 
                                                    album.title, 

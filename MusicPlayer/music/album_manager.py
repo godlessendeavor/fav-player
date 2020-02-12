@@ -25,27 +25,26 @@ songs_logger = logging.getLogger(__name__)
 
 class AlbumManager:
     _collection_root = config.MUSIC_PATH  
-    #TODO: initialize the api from a central place, otherwise we might have two different initializations 
     _musicdb = config._musicdb_api
     
-    #TODO: consider caching for this: lru_cache vs CacheTools?
     @staticmethod  
     @lru_cache(maxsize=8)
     def _get_music_directory_tree():
         '''
             Function that returns a nested dictionary with all files in the Music folder
         '''
-        #result dictionary
+        #initialize dictionary to store the directory tree
         dir_tree = {}
-        rootdir = AlbumManager._collection_root.rstrip(os.sep)
-        start = rootdir.rfind(os.sep) + 1
-        config.logger.debug('Drive path is %s', rootdir)
+        rootdir = AlbumManager._collection_root.rstrip(os.sep) #remove leading whitespaces        
+        config.logger.debug(f'Getting music directory tree from {rootdir}')
+        #recipe for getting the directory tree
+        start = rootdir.rfind(os.sep) + 1 #get the index for the name of the folder 
         for path, dirs, files in os.walk(rootdir):
             folders = path[start:].split(os.sep)
             subdir = dict.fromkeys(files)
-            parent = reduce(dict.get, folders[:-1], dir_tree)
+            parent = reduce(dict.get, folders[:-1], dir_tree)  #call dict.get on every element of the folders list
             parent[folders[-1]] = subdir
-        #return the first value of the dictionary, we're not interested in the root name
+        #get the first value of the dictionary, we're not interested in the root name
         try:
             key, val = next(iter( dir_tree.items()))
         except Exception as ex:
