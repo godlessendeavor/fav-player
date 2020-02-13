@@ -10,6 +10,7 @@ def check_media(func):
             #TODO: raise exception or print error?
             #raise ValueError
         else:
+            #only call function if media player is set
             return func(self, *args, **kwargs)
     return inner
 
@@ -18,13 +19,11 @@ class MyMediaPlayer(object):
     """
     def __init__(self):
         self._media = None
-    
-    @check_media     
+     
     def play(self, fname):
         self._media = MediaPlayer(fname)
         self._media.play()
     
-    @check_media 
     def play_list(self, flist):
         mlp = MediaListPlayer()
         self._media = MediaPlayer()
