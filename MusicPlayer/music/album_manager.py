@@ -46,7 +46,7 @@ class AlbumManager:
             parent[folders[-1]] = subdir
         #get the first value of the dictionary, we're not interested in the root name
         try:
-            key, val = next(iter( dir_tree.items()))
+            key, val = next(iter(dir_tree.items()))
         except Exception as ex:
             config.logger.exception("Could not get Music directory tree")
             raise(ex)            
@@ -65,21 +65,22 @@ class AlbumManager:
         res_tree = {}
         #let's check that the folders match our format Year - Title
         for band, albums in list(dir_tree.items()):
-            for album in albums:
-                x = re.search("[0-9][ ]+-[ ]+.+", album)
-                if x:
-                    #replace the album key with the object from Album class and fill it
-                    album_obj = Album()
-                    album_obj.band = band
-                    album_split = album.split('-',2)
-                    album_obj.year = album_split[0].strip()
-                    album_obj.title = album_split[1].strip()
-                    album_obj.path = os.path.join(AlbumManager._collection_root,band,album)
-                    if band not in res_tree:
-                        res_tree[band] = {}
-                    res_tree[band][album] = album_obj
-                else:
-                    config.logger.info('Album {album} of {band} is not following the format'.format(album=album, band=band))
+            if albums:
+                for album in albums:
+                    x = re.search("[0-9][ ]+-[ ]+.+", album)
+                    if x:
+                        #replace the album key with the object from Album class and fill it
+                        album_obj = Album()
+                        album_obj.band = band
+                        album_split = album.split('-',2)
+                        album_obj.year = album_split[0].strip()
+                        album_obj.title = album_split[1].strip()
+                        album_obj.path = os.path.join(AlbumManager._collection_root,band,album)
+                        if band not in res_tree:
+                            res_tree[band] = {}
+                        res_tree[band][album] = album_obj
+                    else:
+                        config.logger.info('Album {album} of {band} is not following the format'.format(album=album, band=band))
         #now let's check the database
         albums_list = AlbumManager._musicdb.api_albums_get_albums()
         if isinstance(albums_list, list):
