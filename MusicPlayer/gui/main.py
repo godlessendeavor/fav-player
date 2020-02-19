@@ -198,29 +198,30 @@ class GUI():
         self._albums_window.get_themes()                 # Returns a list of all themes that can be set
         self._albums_window.set_theme("radiance")        # Sets an available theme
         self._albums_window.title("Album Search")
+        self._albums_window.geometry("1400x600")
            
         self._album_statusbar = ttk.Label(self._albums_window, text="Album library", relief=SUNKEN, anchor=W, font='Times 12')
         self._album_statusbar.pack(side=BOTTOM, fill=X)
                              
-        #FRAMES STRUCTURE
+        #ALBUM WINDOW FRAMES STRUCTURE
         
         self._top_album_frame = Frame(self._albums_window)
-        self._top_album_frame.pack(side=TOP)
-        
-        self._left_album_frame = Frame(self._top_album_frame)
-        self._left_album_frame.pack(side=LEFT, padx=30, pady=30)
+        self._top_album_frame.pack(side=TOP, expand=True)
+                
+        self._left_album_frame = Frame(self._top_album_frame)    
+        self._left_album_frame.pack(side=LEFT, padx=30, pady=30, expand=True)
         
         self._right_album_frame = Frame(self._top_album_frame)
-        self._right_album_frame.pack(side=RIGHT, padx=30, pady=30)
+        self._right_album_frame.pack(side=RIGHT, padx=30, pady=30, expand=True)
                
+        #TODO: add review to this frame
         self._bottom_album_frame = Frame(self._albums_window)
-        self._bottom_album_frame.pack(side=BOTTOM)
+        self._bottom_album_frame.pack(side=BOTTOM, expand=True)
         
         #ALBUM LIST        
         vscrollbar = Scrollbar(self._left_album_frame, orient="vertical")
-        hscrollbar = Scrollbar(self._left_album_frame, orient="horizontal")
         
-        self._album_listbox = ttk.Treeview(self._left_album_frame, yscrollcommand=vscrollbar.set, xscrollcommand=hscrollbar.set)  
+        self._album_listbox = ttk.Treeview(self._left_album_frame, yscrollcommand=vscrollbar.set)  
         self._album_listbox["columns"] = ('Band', 'Title', 'Style', 'Year', 'Location', 'Type', 'Score', 'InBackup')
         self._album_listbox.heading("Band", text="Band",anchor=W)
         self._album_listbox.heading("Title", text="Title",anchor=W)
@@ -230,27 +231,26 @@ class GUI():
         self._album_listbox.heading("Type", text="Type",anchor=W)        
         self._album_listbox.heading("Score", text="Score",anchor=W)        
         self._album_listbox.heading("InBackup", text="In Backup",anchor=W)
-        self._album_listbox["show"] = "headings" #This will remove the first column from the viewer (first column of this widget is the identifier of the row)
+        self._album_listbox["show"] = "headings" # This will remove the first column from the viewer (first column of this widget is the identifier of the row)
+        # add functionality for sorting
         for col in self._album_listbox["columns"]:
             self._album_listbox.heading(col, text=col, command=lambda _col=col: \
                      GUI._treeview_sort_column(self._album_listbox, _col, False))
         
-        self._album_listbox.column("Band",     minwidth=0, width=140)
-        self._album_listbox.column("Title",    minwidth=0, width=200)
-        self._album_listbox.column("Style",    minwidth=0, width=120)
+        self._album_listbox.column("Band",     minwidth=0, width=220)
+        self._album_listbox.column("Title",    minwidth=0, width=280)
+        self._album_listbox.column("Style",    minwidth=0, width=160)
         self._album_listbox.column("Year",     minwidth=0, width=50)
-        self._album_listbox.column("Location", minwidth=0, width=80)        
-        self._album_listbox.column("Type",     minwidth=0, width=80)        
+        self._album_listbox.column("Location", minwidth=0, width=120)        
+        self._album_listbox.column("Type",     minwidth=0, width=120)        
         self._album_listbox.column("Score",    minwidth=0, width=40)        
         self._album_listbox.column("InBackup", minwidth=0, width=20)
         
-        vscrollbar.config(command=self._album_listbox.yview)
-        #hscrollbar.config(command=self._album_listbox.xview) #TODO: optional horizontal scrollbar. Really needed?
-        
-        vscrollbar.pack(side="right", fill="y")
-        #hscrollbar.pack(side="bottom", fill="x")
-        
-        self._album_listbox.pack(side="left", fill="y", expand=True) 
+        vscrollbar.config(command=self._album_listbox.yview)        
+        vscrollbar.pack(side="right", fill="y", expand=True)
+                                    
+        #TODO: expand doesn't seem to work. How to increase number of rows in the treeview?
+        self._album_listbox.pack(side="left", fill=BOTH, expand=True) 
         
         def do_album_list_popup(event):
             # display the _album_list_popup menu
@@ -277,8 +277,8 @@ class GUI():
                 #if selected row is from the band root then we do not continue
                 pass
             else:
-                #TODO: load image asynchronously and perhaps move this to another class
-                #That class should look for a cover art from musicbrainz if not found here
+                #TODO: load image asynchronously and perhaps move this to another module
+                #That module should look for a cover art from musicbrainz if not found here
                 file_names = [f for f in listdir(album.path) if isfile(join(album.path, f))]
                 image = None
                 for file_name in file_names:
@@ -302,7 +302,7 @@ class GUI():
         
         #album image
         self._album_workart_canvas = Canvas(self._top_album_frame, width = 300, height = 300)  
-        self._album_workart_canvas.pack()  
+        self._album_workart_canvas.pack(expand=True)  
         self._album_workart_canvas_frame = self._album_workart_canvas.create_window((0,0),
                                                                      window=self._right_album_frame, 
                                                                      anchor = NW)
@@ -495,6 +495,11 @@ class GUI():
     def _add_to_album_list(self, album_dict):
         band_index = 1 
         for band, albums in album_dict.items():
+            # add tags for identifying which background color to apply
+            if band_index % 2:
+                tags = ('oddrow',)
+            else:
+                tags = ('evenrow',)
             band_root = self._album_listbox.insert("", band_index, text=band,
                                            values=(band, 
                                                    "", 
@@ -503,7 +508,7 @@ class GUI():
                                                    "", 
                                                    "", 
                                                    "", 
-                                                   ""))
+                                                   ""), tags=tags)
             config.logger.debug(f"Adding band {band} from {band_root}")
             band_index += 1            
             album_index = 1 
@@ -520,6 +525,10 @@ class GUI():
                                                    album.in_db))
                 self._albums_list[album_id] = album
                 album_index += 1
+        #TODO: sort results by band name
+        # apply background colors
+        self._album_listbox.tag_configure('oddrow', background='#D9FFDB')
+        self._album_listbox.tag_configure('evenrow', background='#FFE5CD')
         
     def _show_details(self):
         self._details_thread.start()
