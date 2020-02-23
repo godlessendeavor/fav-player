@@ -53,12 +53,16 @@ class Favorites(BaseModel):
     class Meta:
         table_name = 'favorites'
 
-#function decorator for opening/closing the database. Useful for each method that requires access to the database
+
 def database_mgmt(func):
+    '''
+        Function decorator for opening/closing the database. Useful for each method that requires access to the database
+    '''
     def wrapper_do_open_close(*args, **kwargs):
-        database.connect() 
+        database.connect(reuse_if_open=True) 
         ret = func(*args, **kwargs)
-        database.close()
+        if not database.is_closed():
+            database.close()
         return ret
     return wrapper_do_open_close
 
