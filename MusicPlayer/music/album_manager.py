@@ -12,7 +12,6 @@ from music.album import Album
 from music.song import Song
 from config import config
 import musicbrainzngs
-import musicdb_client
 from builtins import staticmethod
 
 #set other logs config
@@ -27,15 +26,15 @@ class AlbumManager:
     _collection_root = config.MUSIC_PATH  
     _musicdb = config._musicdb_api
     
-    @staticmethod  
+    @classmethod  
     @lru_cache(maxsize=8)
-    def _get_music_directory_tree():
+    def _get_music_directory_tree(cls):
         '''
             Function that returns a nested dictionary with all files in the Music folder
         '''
         #initialize dictionary to store the directory tree
         dir_tree = {}
-        rootdir = AlbumManager._collection_root.rstrip(os.sep) #remove leading whitespaces        
+        rootdir = cls._collection_root.rstrip(os.sep) #remove leading whitespaces        
         config.logger.debug(f'Getting music directory tree from {rootdir}')
         #recipe for getting the directory tree
         start = rootdir.rfind(os.sep) + 1 #get the index for the name of the folder 
@@ -52,15 +51,14 @@ class AlbumManager:
             raise(ex)            
         return val
     
-    #TODO: make async function using asyncio. Follow https://realpython.com/async-io-python/
-    @staticmethod  
-    def get_albums_from_collection():
+    @classmethod  
+    def get_albums_from_collection(cls):
         '''
         Gets the albums collection from the configured Music Directory 
         and compares with the database collection.
         '''        
         #First we get a directory tree with all the folders and files in the music directory tree
-        dir_tree = AlbumManager._get_music_directory_tree()
+        dir_tree = cls._get_music_directory_tree()
         #this will be our final directory tree
         res_tree = {}
         #let's check that the folders match our format Year - Title
@@ -75,14 +73,14 @@ class AlbumManager:
                         album_split = album.split('-',2)
                         album_obj.year = album_split[0].strip()
                         album_obj.title = album_split[1].strip()
-                        album_obj.path = os.path.join(AlbumManager._collection_root,band,album)
+                        album_obj.path = os.path.join(cls._collection_root,band,album)
                         if band not in res_tree:
                             res_tree[band] = {}
                         res_tree[band][album] = album_obj
                     else:
                         config.logger.info('Album {album} of {band} is not following the format'.format(album=album, band=band))
         #now let's check the database
-        albums_list = AlbumManager._musicdb.api_albums_get_albums()
+        albums_list = cls._musicdb.api_albums_get_albums()
         if isinstance(albums_list, list):
             for db_album in albums_list:
                 if db_album.band in res_tree:
@@ -96,8 +94,21 @@ class AlbumManager:
             #TODO: return also another warning list if in database but not in collection                       
         return res_tree
     
-    @staticmethod
-    def get_favorites(quantity, score):
+    @classmethod
+    def update_album(cls, album):
+        '''
+            Function to update the albums. 
+        '''
+        # TODO: apparently the path attribute is not filled and the update fails. Check why
+        try:
+            print(f"Updating album {album.path}")
+            cls._musicdb.api_albums_update_album(album)
+        except Exception as ex:
+            config.logger.exception(f'Could not update review for album {album.title}') 
+            
+    
+    @classmethod
+    def get_favorites(cls, quantity, score):
         """
         Gets a list with random songs from the favorites list that complies with the required score.
         :param quantity, the number of songs to return
@@ -105,14 +116,14 @@ class AlbumManager:
         """
         fav_songs = []
         #get a list from the database with the favorite songs
-        result = AlbumManager._musicdb.api_songs_get_songs(quantity = quantity, score = score)
+        result = cls._musicdb.api_songs_get_songs(quantity = quantity, score = score)
         if result:            
             if isinstance(result.songs, list):
                 #get albums from collection to search for this song
-                albums_dict = AlbumManager.get_albums_from_collection()
+                albums_dict = cls.get_albums_from_collection()
                 #for every song in the database result search the album info in the database
                 for db_song in result.songs:
-                    db_albums = AlbumManager._musicdb.api_albums_get_albums(album_id = db_song.disc_id)
+                    db_albums = cls._musicdb.api_albums_get_albums(album_id = db_song.disc_id)
                     #make sure it's only one
                     if isinstance(db_albums, list):
                         if len(db_albums) == 1:
@@ -161,7 +172,7 @@ class AlbumManager:
         :param style the style of the band. Used also for disambiguation.        
         '''
         musicbrainzngs.set_useragent("TODO: add name of app","1.0","TODO: add EMAIL from settings")
-        bands_list = musicbrainzngs.search_artists(artist = band_name, type = "group", country = country)
+        bands_list = musicbrainzngs.search_artists(artist=band_name, type="group", country=country)
         disambiguation_keywords = style.lower().split() 
         filtered_bands = None
         number_of_bands = 0

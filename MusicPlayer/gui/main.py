@@ -1,6 +1,8 @@
-import os
 import threading
 import time
+import hashlib
+from os import listdir
+from os.path import basename, dirname, isfile, join
 
 import tkinter.messagebox
 from tkinter import *
@@ -8,8 +10,6 @@ from tkinter import *
 from tkinter import ttk
 from ttkthemes import themed_tk as tk
 from PIL import ImageTk, Image as PILImage
-from os import listdir
-from os.path import isfile, join
 
 from musicdb_client.rest import ApiException
 
@@ -20,16 +20,15 @@ from music.album_manager import AlbumManager
 from music.media_player import MyMediaPlayer
 
 
+def get_signature(contents):
+    '''
+        Function to get the MD5 hash of the given string. Useful for checking if changes have been made to a string.
+    '''
+    return hashlib.md5(str(contents).encode()).digest()
+
+
 class GUI():
-    
-    class Splash(Toplevel):
-        def __init__(self, parent):
-            Toplevel.__init__(self, parent)
-            self.title("Loading...")
-    
-            ## required to make window show before the program gets to the mainloop
-            self.update()
-    
+       
     def __init__(self):
         self._player = MyMediaPlayer()
         self._paused = FALSE          
@@ -159,13 +158,13 @@ class GUI():
         self._middle_right_frame.pack(pady=30, padx=30)
         
         #images must be 50x50 pix since I couldn't find the way to resize them by code
-        gui_root = os.path.dirname(__file__)
-        self._play_photo   = PhotoImage(file=os.path.join(gui_root, 'images/play_small.png'))
-        self._stop_photo   = PhotoImage(file=os.path.join(gui_root, 'images/stop_small.png'))
-        self._pause_photo  = PhotoImage(file=os.path.join(gui_root, 'images/pause_small.png'))        
-        self._rewind_photo = PhotoImage(file=os.path.join(gui_root, 'images/rewind_small.png'))
-        self._mute_photo   = PhotoImage(file=os.path.join(gui_root, 'images/mute_small.png'))
-        self._volume_photo = PhotoImage(file=os.path.join(gui_root, 'images/volume_small.png'))
+        gui_root = dirname(__file__)
+        self._play_photo   = PhotoImage(file=join(gui_root, 'images/play_small.png'))
+        self._stop_photo   = PhotoImage(file=join(gui_root, 'images/stop_small.png'))
+        self._pause_photo  = PhotoImage(file=join(gui_root, 'images/pause_small.png'))        
+        self._rewind_photo = PhotoImage(file=join(gui_root, 'images/rewind_small.png'))
+        self._mute_photo   = PhotoImage(file=join(gui_root, 'images/mute_small.png'))
+        self._volume_photo = PhotoImage(file=join(gui_root, 'images/volume_small.png'))
         
         self._play_button   = Button(self._middle_right_frame,       image=self._play_photo,   borderwidth=3, command=self._play_music)
         self._stop_button   = Button(self._middle_right_frame,       image=self._stop_photo,   borderwidth=3, command=self._stop_music)
@@ -203,6 +202,10 @@ class GUI():
                   
         self._album_statusbar = ttk.Label(self._albums_window, text="Album library", relief=SUNKEN, anchor=W, font='Times 12')
         self._album_statusbar.pack(side=BOTTOM, fill=X)
+        
+        # variable that stores the selected album
+        self._selected_album = None
+        self._selected_album_review_signature = None
                              
         #ALBUM WINDOW FRAMES STRUCTURE
         
@@ -273,7 +276,7 @@ class GUI():
             album = self._albums_list[row]            
             file_names = [f for f in listdir(album.path) if isfile(join(album.path, f))]
             for file_name in file_names:
-                self._add_file_to_playlist(os.path.join(album.path, file_name), album) 
+                self._add_file_to_playlist(join(album.path, file_name), album) 
             
         def do_cover_art_show(event):
             selection = self._album_listbox.identify_row(event.y)
@@ -283,13 +286,31 @@ class GUI():
                 #if selected row is from the band root then we do not continue
                 pass
             else:
+                # if there was a previous album let's check if we have to update the review
+                if self._selected_album:
+                    review = self._review_text_box.get(1.0, END)
+                    if self._selected_album_review_signature != get_signature(review):
+                        config.logger.info(f"Review for album {self._selected_album.title} has changed. Updating the DB.")
+                        self._selected_album.review = review
+                        AlbumManager.update_album(self._selected_album)
+                        
+        
+                # set the review text
+                self._review_text_box.delete(1.0, END)   
+                if album.review:               
+                    self._review_text_box.insert(END, album.review)
+                    self._selected_album_review_signature = get_signature(self._review_text_box.get(1.0, END))
+                #update selected album
+                self._selected_album = album
+                
+                
                 #TODO: load image asynchronously and perhaps move this to another module
                 #That module should look for a cover art from musicbrainz if not found here
                 file_names = [f for f in listdir(album.path) if isfile(join(album.path, f))]
                 image = None
                 for file_name in file_names:
                     if "front" in file_name.casefold():
-                        image = os.path.join(album.path, file_name)
+                        image = join(album.path, file_name)
                         break
                 if image:
                     pil_image = PILImage.open(image)
@@ -297,10 +318,7 @@ class GUI():
                     self._current_album_img = ImageTk.PhotoImage(pil_image, master=self._albums_window)  
                     self._album_workart_canvas.create_image(20, 20, anchor=NW, image=self._current_album_img) 
                 
-                # set the review text
-                self._review_text_box.delete(1.0, END)   
-                if album.review:               
-                    self._review_text_box.insert(END, album.review)
+                
             
         #album_list POUP
         self._album_list_popup = tkinter.Menu(self._albums_window, tearoff=0)
@@ -481,7 +499,7 @@ class GUI():
     ######################### FUNCTION HELPERS #####################
     
     def _add_file_to_playlist(self, path_name, album):
-        file_name = os.path.basename(path_name)
+        file_name = basename(path_name)
         song = Song()
         song.album = album
         try:
