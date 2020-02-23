@@ -47,6 +47,9 @@ class GUI():
         
         
     def _init_main_window_layout(self):
+        '''
+            Initializes the main window layout
+        '''
         self._window_root = tk.ThemedTk()
         self._window_root.protocol("WM_DELETE_WINDOW", self._on_closing)
         
@@ -99,8 +102,7 @@ class GUI():
         self._bottom_right_frame = Frame(self._right_frame)
         self._bottom_right_frame.pack()
         
-        #PLAYLIST
-        
+        #PLAYLIST        
         vscrollbar = Scrollbar(self._top_left_frame, orient="vertical")
         hscrollbar = Scrollbar(self._top_left_frame, orient="horizontal")
         
@@ -114,11 +116,8 @@ class GUI():
         self._playlistbox.column("Length",minwidth=0,width=60)
         self._playlistbox["show"] = "headings" #This will remove the first column from the viewer (first column of this widget is the identifier of the row)
         
-        vscrollbar.config(command=self._playlistbox.yview)
-        #hscrollbar.config(command=self._playlistbox.xview) #TODO: optional horizontal scrollbar. Really needed?
-        
+        vscrollbar.config(command=self._playlistbox.yview)        
         vscrollbar.pack(side="right", fill="y")
-        #hscrollbar.pack(side="bottom", fill="x")
         
         self._playlistbox.pack(side="left", fill="y", expand=True) 
         
@@ -190,16 +189,18 @@ class GUI():
         self._window_root.mainloop()
         
     
-    def _init_albums_window_layout(self):        
-        #TODO: do we need to call a toplevel?
+    def _init_albums_window_layout(self):  
+        '''
+            Initializes the albums window layout
+        '''      
         self._albums_window = tk.ThemedTk()
         self._albums_window.protocol("WM_DELETE_WINDOW", self._on_closing_album_window)
         
         self._albums_window.get_themes()                 # Returns a list of all themes that can be set
         self._albums_window.set_theme("radiance")        # Sets an available theme
         self._albums_window.title("Album Search")
-        self._albums_window.geometry("1400x600")
-           
+        self._albums_window.geometry("1400x600")         # TODO: geometry set but size of treeview doesn't change. What to do?
+                  
         self._album_statusbar = ttk.Label(self._albums_window, text="Album library", relief=SUNKEN, anchor=W, font='Times 12')
         self._album_statusbar.pack(side=BOTTOM, fill=X)
                              
@@ -247,11 +248,16 @@ class GUI():
         self._album_listbox.column("InBackup", minwidth=0, width=20)
         
         vscrollbar.config(command=self._album_listbox.yview)        
-        vscrollbar.pack(side="right", fill="y", expand=True)
+        vscrollbar.pack(side=RIGHT, fill=Y, expand=True)
                                     
         #TODO: expand doesn't seem to work. How to increase number of rows in the treeview?
-        self._album_listbox.pack(side="left", fill=BOTH, expand=True) 
+        self._album_listbox.pack(side=LEFT, fill=BOTH, expand=True) 
         
+        # review text
+        self._review_text_box = Text(self._bottom_album_frame, \
+                                   font='Times 12', relief=GROOVE, height=100, width=100)
+        self._review_text_box.pack(side=BOTTOM, fill=BOTH, expand=True)
+                   
         def do_album_list_popup(event):
             # display the _album_list_popup menu
             try:                
@@ -290,6 +296,11 @@ class GUI():
                     pil_image = pil_image.resize((250, 250), PILImage.ANTIALIAS)
                     self._current_album_img = ImageTk.PhotoImage(pil_image, master=self._albums_window)  
                     self._album_workart_canvas.create_image(20, 20, anchor=NW, image=self._current_album_img) 
+                
+                # set the review text
+                self._review_text_box.delete(1.0, END)   
+                if album.review:               
+                    self._review_text_box.insert(END, album.review)
             
         #album_list POUP
         self._album_list_popup = tkinter.Menu(self._albums_window, tearoff=0)
@@ -297,7 +308,7 @@ class GUI():
                 
         #add popup to album_list treeview        
         self._album_listbox.bind("<Button-3>", do_album_list_popup)  
-        #add Covert art change to treeview selection      
+        #add Cover art change to treeview selection      
         self._album_listbox.bind("<Button-1>", do_cover_art_show)  
         
         #album image
@@ -324,7 +335,10 @@ class GUI():
             
     ###################### GET THE FAVORITE SONGS ###########################
             
-    def _play_favs(self):        
+    def _play_favs(self): 
+        '''
+            Function to play the favorite songs
+        '''       
         try:
             #get favorite song list according to the parameters
             #TODO: show window to select quantity and score
