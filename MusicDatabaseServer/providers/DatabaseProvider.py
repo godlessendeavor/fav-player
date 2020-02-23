@@ -60,9 +60,15 @@ def database_mgmt(func):
     '''
     def wrapper_do_open_close(*args, **kwargs):
         database.connect(reuse_if_open=True) 
-        ret = func(*args, **kwargs)
+        ex = None
+        try:
+            ret = func(*args, **kwargs)
+        except Exception as ex:
+            logger.warning('Holding exception to close Database')
         if not database.is_closed():
             database.close()
+        if ex: 
+            raise(ex)
         return ret
     return wrapper_do_open_close
 
