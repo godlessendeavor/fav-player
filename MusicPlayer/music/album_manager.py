@@ -70,28 +70,32 @@ class AlbumManager:
                         #replace the album key with the object from Album class and fill it
                         album_obj = Album()
                         album_obj.band = band
+                        band_key = band.casefold()
                         album_split = album.split('-',2)
                         album_obj.year = album_split[0].strip()
                         album_obj.title = album_split[1].strip()
                         album_obj.path = os.path.join(cls._collection_root,band,album)
-                        if band not in res_tree:
-                            res_tree[band] = {}
-                        res_tree[band][album] = album_obj
+                        if band_key not in res_tree:
+                            res_tree[band_key] = {}
+                        res_tree[band_key][album] = album_obj
                     else:
                         config.logger.info('Album {album} of {band} is not following the format'.format(album=album, band=band))
         #now let's check the database
         albums_list = cls._musicdb.api_albums_get_albums()
         if isinstance(albums_list, list):
             for db_album in albums_list:
-                if db_album.band in res_tree:
-                    for key, album_obj in res_tree[db_album.band].items():
+                band_key = db_album.band.casefold()
+                if band_key in res_tree:
+                    for key, album_obj in res_tree[band_key].items():
                         if album_obj.title.casefold() == db_album.title.casefold():
+                            #TODO: check why location is none
                             album_obj.merge(db_album)
                             album_obj.in_db = True   
                             break
                     if not album_obj.in_db:
-                        album_logger.info(f'Album {album_obj.title} of band {album_obj.band} not found in database')
-            #TODO: return also another warning list if in database but not in collection                       
+                        album_logger.warning(f'Album {album_obj.title} of band {album_obj.band} not found in database')
+                else:
+                    album_logger.warning(f'Band {db_album.band} not found in collection')                     
         return res_tree
     
     @classmethod
@@ -99,12 +103,10 @@ class AlbumManager:
         '''
             Function to update the albums. 
         '''
-        # TODO: apparently the path attribute is not filled and the update fails. Check why
         try:
-            print(f"Updating album {album.path}")
             cls._musicdb.api_albums_update_album(album)
-        except Exception as ex:
-            config.logger.exception(f'Could not update review for album {album.title}') 
+        except Exception:
+            config.logger.exception(f'Could not update album with title {album.title}') 
             
     
     @classmethod

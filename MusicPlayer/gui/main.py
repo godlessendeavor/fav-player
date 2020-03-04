@@ -541,11 +541,11 @@ class GUI():
                                                    "", 
                                                    "", 
                                                    ""), tags=tags)
-            config.logger.debug(f"Adding band {band} from {band_root}")
+            #config.logger.debug(f"Adding band {band} from {band_root}")
             band_index += 1            
             album_index = 1 
             for album_key, album in albums.items():
-                config.logger.debug(f"Adding album {album} to band {band}")                
+                #config.logger.debug(f"Adding album {album} to band {band}")                
                 album_id = self._album_listbox.insert(band_root, album_index, 
                                            values=("", 
                                                    album.title, 
