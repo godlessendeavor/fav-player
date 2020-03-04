@@ -151,7 +151,7 @@ class DatabaseProvider(object):
             result = Album.select()
         if result:
             list_result = [row for row  in result.dicts()]   
-            logger.debug('Getting result for get_songs: %s', list_result) 
+            logger.debug('Getting result for get_album: %s', list_result) 
             return list_result,200
         else:
             return album_id, 400
@@ -167,7 +167,6 @@ class DatabaseProvider(object):
         try:            
             album_entry.group_name = album['band']
             album_entry.title      = album['title']
-            album_entry.path       = album['path']
             album_entry.year       = int(album['year'])
         except KeyError:
             logger.exception('Exception on key when creating album')
