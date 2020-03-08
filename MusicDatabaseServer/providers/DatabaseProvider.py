@@ -65,17 +65,21 @@ def database_mgmt(func):
             ret = func(*args, **kwargs)
         except Exception as ex:
             logger.warning('Holding exception to close Database')
-        if not database.is_closed():
-            database.close()
-        if ex: 
+            if not database.is_closed():
+                database.close()
             raise(ex)
+        if not database.is_closed():
+            database.close()           
         return ret
     return wrapper_do_open_close
 
 
 class DatabaseProvider(object):
     
-    fav_name_map = {'id': 'id', 'disc_id': 'disc_id', 'track_title': 'title', 'file_name': 'file_name', 'score': 'score', 'track_no': 'track_number', 'type': 'type'}
+    fav_name_map = {'id': 'id', 'disc_id': 'disc_id', 'track_title': 'title', 'file_name': 'file_name', \
+                     'score': 'score', 'track_no': 'track_number', 'type': 'type'}
+    album_name_map = { 'id' : 'id', 'copy' : 'copy', 'band' : 'band', 'loc' : 'country', 'score' : 'score' , \
+                       'review' : 'review', 'style': 'style', 'title': 'title', 'type': 'type', 'year' : 'year' }
     
     @database_mgmt       
     def _search_song_by_title_and_album_id(self, song_title, album_id):
@@ -149,8 +153,8 @@ class DatabaseProvider(object):
             result = Album.select().order_by(fn.Rand()).limit(int(quantity))
         else:
             result = Album.select()
-        if result:
-            list_result = [row for row  in result.dicts()]   
+        if result:            
+            list_result = [{DatabaseProvider.album_name_map[name]: val for name, val in row.items()} for row in result.dicts()] 
             logger.debug('Getting result for get_album: %s', list_result) 
             return list_result,200
         else:
@@ -158,23 +162,23 @@ class DatabaseProvider(object):
     
     @database_mgmt
     def create_album(self, album) ->str:
-        #load the object and convert to album
+        # load the object and convert to album
         #TODO: could we use the next line to convert to object with attributes from json dict?
         #album_entry = json.loads(album, object_hook=lambda d: Namespace(**d))       
         
         album_entry = Album()
-        #first copy compulsory fields and validate types
+        # first copy compulsory fields and validate types
         try:            
             album_entry.group_name = album['band']
             album_entry.title      = album['title']
             album_entry.year       = int(album['year'])
-        except KeyError:
-            logger.exception('Exception on key when creating album')
+        except KeyError as ex:
+            logger.exception('Exception on key when creating album. %s', ex)
             return album, 400
-        except ValueError:
-            logger.exception('Exception on value when creating album')
+        except ValueError as ex:
+            logger.exception('Exception on value when creating album. %s', ex)
             return album, 400
-        #now copy optional fields
+        # now copy optional fields
         try:
             album_entry.mark     = float(album['score'])   
             album_entry.review   = album['review']
@@ -182,10 +186,12 @@ class DatabaseProvider(object):
             album_entry.loc      = album['country']   
             album_entry.copy     = album['copy']
             album_entry.style    = album['style']  
-        except KeyError:
-            logger.warning('Type was not provided for album: ', album)  
-        except ValueError:
-            logger.warning('Exception on value when creating album', album) 
+        except KeyError as ex:
+            logger.warning('Type was not provided for album: %s. %s', album, ex)  
+        except ValueError as ex:
+            logger.warning('Exception on value when creating album %s. %s', album, ex) 
+        # save object in database
+        album.save()
         return album, 200
     
     @database_mgmt
