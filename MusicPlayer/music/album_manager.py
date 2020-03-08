@@ -105,8 +105,9 @@ class AlbumManager:
         '''
         try:
             cls._musicdb.api_albums_update_album(album)
-        except Exception:
+        except Exception as ex:
             config.logger.exception(f'Could not update album with title {album.title}') 
+            raise(ex)
             
     
     @classmethod
@@ -131,10 +132,10 @@ class AlbumManager:
                         if len(db_albums) == 1:
                             db_album = db_albums[0]
                             #if it's the same band then we continue, otherwise there might be a mistake
-                            if db_album.band in albums_dict:
+                            if db_album.band.casefold() in albums_dict.keys():
                                 found_album = False
                                 #now check for all albums for this band in the collection to that one with same database id
-                                for album_key, album in albums_dict[db_album.band].items():
+                                for album_key, album in albums_dict[db_album.band.casefold()].items():
                                     if album.id == db_album.id:   
                                         found_album = True
                                         song = Song(db_song)    
@@ -161,7 +162,7 @@ class AlbumManager:
                                     songs_logger.info(f"Album with database id {db_album.id} could not be found in database for song {db_song.title}")       
                         else:
                             config.logger.error(f'Found too many albums ({len(db_albums) }) with id {db_song.disc_i}')
-        #logger.debug(f"returning {fav_songs}")
+        config.logger.debug(f"returning {fav_songs}")
         return fav_songs
                     
     

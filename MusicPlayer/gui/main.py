@@ -292,7 +292,10 @@ class GUI():
                     if self._selected_album_review_signature != get_signature(review):
                         config.logger.info(f"Review for album {self._selected_album.title} has changed. Updating the DB.")
                         self._selected_album.review = review
-                        AlbumManager.update_album(self._selected_album)
+                        try:
+                            AlbumManager.update_album(self._selected_album)
+                        except:
+                            messagebox.showerror(message='Could not save album. See log for errors.')
                         
         
                 # set the review text
