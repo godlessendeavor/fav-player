@@ -149,8 +149,10 @@ class AlbumManager:
                                                 #if file == song.file_name:                                
                                                 if song.title in file_name:
                                                     found_song = True
-                                                    #TODO: actually it should the dirs should be joined as well, for the reasons of albums with multiple cds
                                                     song.abs_path = os.path.join(album.path, file_name)
+                                                    song.file_name = file_name
+                                                    print("Appending song")
+                                                    print(song)
                                                     fav_songs.append(song)
                                                     break
                                             if not found_song:

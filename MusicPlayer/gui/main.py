@@ -114,8 +114,8 @@ class GUI():
         self._playlistbox.heading("Title", text="Title",anchor=W)
         self._playlistbox.heading("Band", text="Band",anchor=W)
         self._playlistbox.heading("Album", text="Album",anchor=W)
-        self._playlistbox.heading("Length", text="Length",anchor=W)
-        self._playlistbox.column("Length",minwidth=0,width=60)
+        self._playlistbox.heading("Length", text="Length")
+        self._playlistbox.column("Length",minwidth=0,width=60, anchor=E)
         self._playlistbox["show"] = "headings" #This will remove the first column from the viewer (first column of this widget is the identifier of the row)
         
         vscrollbar.config(command=self._playlistbox.yview)        
@@ -281,7 +281,12 @@ class GUI():
             for file_name in file_names:
                 self._add_file_to_playlist(join(album.path, file_name), album) 
             
-        def do_cover_art_show(event):
+        def do_album_selection(event):
+            '''
+                Event on album selection, it will:
+                - Show the cover art from the selected album in _current_album_img
+                - Show the review of the album in _review_text_box
+            '''
             selection = self._album_listbox.identify_row(event.y)
             try:
                 album = self._albums_list[selection]
@@ -296,11 +301,11 @@ class GUI():
                         config.logger.info(f"Review for album {self._selected_album.title} has changed. Updating the DB.")
                         self._selected_album.review = review
                         try:
+                # TODO: save the review also when the window is closed. There might not be a new album selection!
                             AlbumManager.update_album(self._selected_album)
                         except:
                             messagebox.showerror(message='Could not save album. See log for errors.')
                         
-        
                 # set the review text
                 self._review_text_box.delete(1.0, END)   
                 if album.review:               
@@ -333,7 +338,7 @@ class GUI():
         #add popup to album_list treeview        
         self._album_listbox.bind("<Button-3>", do_album_list_popup)  
         #add Cover art change to treeview selection      
-        self._album_listbox.bind("<Button-1>", do_cover_art_show)  
+        self._album_listbox.bind("<Button-1>", do_album_selection)  
         
         #album image
         self._album_workart_canvas = Canvas(self._top_album_frame, width = 300, height = 300)  

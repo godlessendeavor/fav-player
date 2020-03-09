@@ -61,7 +61,7 @@ class Song(DB_song):
     
     @property
     def total_length(self):
-        return str(self.minutes) + ":" + str(self.seconds)
+        return str(self.minutes) + ":" + format(self.seconds, '02d')
     
     @property
     def abs_path(self):
@@ -110,7 +110,12 @@ class Song(DB_song):
         else:
             raise Exception(f"File {song_path} is not MP3.")
         
-    #TODO: add __repr__ using the base class one plus the new attributes
+    def __str__(self):
+        return str(self.__repr__())    
+        
+    def __repr__(self):
+        obj = self.__dict__
+        return str(obj)
         
       
     
