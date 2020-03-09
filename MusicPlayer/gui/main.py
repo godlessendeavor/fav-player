@@ -56,6 +56,9 @@ class GUI():
         self._window_root.set_theme("radiance")        # Sets an available theme
         self._window_root.title("MusicPlayer")
         
+        #TODO: create a default list of settings for the themes: which theme and fonts to use. 
+        #These themes will be used by all windows like the socre question window
+        
         # Fonts - Arial (corresponds to Helvetica), Courier New (Courier), Comic Sans MS, Fixedsys,
         # MS Sans Serif, MS Serif, Symbol, System, Times New Roman (Times), and Verdana
         #
@@ -354,27 +357,55 @@ class GUI():
         for file_name in file_names:
             self._add_file_to_playlist(file_name, None) 
             
-    ###################### GET THE FAVORITE SONGS ###########################
+    ###################### GET FAVORITE SONGS ###########################
+    
+    class FavsScoreWindow(object):
+        '''
+            Window for asking the score for favorite songs
+        '''
+        def __init__(self, master):
+            top=self.top = Toplevel(master)
+            self.label = Label(top,text="Please give the minimum score of songs to play")
+            self.label.pack()
+            self.entry = Entry(top)
+            self.entry.pack()
+            self.button = Button(top,text='Ok',command=self.cleanup)
+            self.button.pack()
+            
+        def cleanup(self):
+            self.score = self.entry.get()
+            self.top.destroy()
             
     def _play_favs(self): 
         '''
             Function to play the favorite songs
         '''       
+        #get favorite song list according to the parameters
+        #TODO: add an infinite loop for quantity and  refresh table 
+        quantity = 5
+        questionWindow = self.FavsScoreWindow(self._window_root)
+        self._window_root.wait_window(questionWindow.top)
         try:
-            #get favorite song list according to the parameters
-            #TODO: show window to select quantity and score
-            quantity = 5
-            score = 5
-            songs = AlbumManager.get_favorites(quantity, score)
-            for song in songs:
-                self._add_song_to_playlist(song) 
-        except ApiException:
-            config.logger.exception("Exception when calling PublicApi->api_songs_get_songs")
-            
+            score = float(questionWindow.score)
+        except ValueError:
+            messagebox.showerror("Error", "Score must be a number between 0 and 10")
+        else:
+            if score < 0.0 or score > 10.0:
+                messagebox.showerror("Error", "Score must be between 0 and 10")
+            else:    
+                try:
+                    #TODO: check why the abs_path is not shown in the playlistbox
+                    songs = AlbumManager.get_favorites(quantity, score)
+                    for song in songs:
+                        self._add_song_to_playlist(song) 
+                except ApiException:
+                    config.logger.exception("Exception when getting favorite songs from the server")
+        
             
     ####################### GET THE ALBUM LIST ##################################
             
     def _show_album_list(self):
+        #TODO make this function generic and apply it to the favorites retrieval
         """Function to get the album list to present in a new window
         It will start a new thread to get the information from the server and a progressbar to indicate progress
         Progress update is checked in _check_album_list_thread
@@ -403,7 +434,7 @@ class GUI():
         
         
     def _show_album_list_thread(self):
-        """Function to get the album list. Since it's time consuming it should be called in a separate thread."""
+        """Function to get the album list."""
         try:
             self._albums_from_server = AlbumManager.get_albums_from_collection() 
         except:
@@ -416,13 +447,23 @@ class GUI():
     ############### MAIN PLAYER #############
 
     def _playlistbox_add_to_favorites(self):
+        '''
+            Function to add the selected song from the playlist to the favorites in the server.
+        '''
         song = self._playlist[self._playlist_popup.selection] 
-        self._musicdb.api_songs_update_song(song)
+        try:
+            self._musicdb.api_songs_update_song(song)
+        except ApiException:
+            messagebox.showerror("Error", "Error adding a new favorite song. Please check logging.")    
         
         
     ################### BUTTONS ACTIONS ######################################################
          
     def _delete_song(self):
+        '''
+            Function to delete the selected song from the playlist.
+            It does not remove it from the server even if it's a favorite song.
+        '''
         selected_songs = self._playlistbox.selection()
         if selected_songs:
             selected_song = selected_songs[0]        
@@ -430,6 +471,10 @@ class GUI():
             self._playlist.pop(selected_song)
             
     def _play_music(self, file_list = None):
+        '''
+            Plays the list of songs from the playlistbox. 
+            It will start on the selected song from the playlist.
+        '''
         if self._paused:            
             self._player.pause()
             self.statusbar['text'] = "Music Resumed"
@@ -448,12 +493,18 @@ class GUI():
                 config.logger.exception('Exception while playing music') 
                 tkinter.messagebox.showerror('File not found', 'Player could not find the file. Please check again.')
 
-    def _stop_music(self):        
+    def _stop_music(self):   
+        '''
+            Stops playing music.
+        '''     
         self._player.stop()
         self.statusbar['text'] = "Music stopped"
     
     
     def _pause_music(self):
+        '''
+            Pauses the music in the current playing song.
+        '''
         self._player.pause()
         if self._paused:
             self._paused = FALSE
@@ -464,11 +515,13 @@ class GUI():
     
     
     def _rewind_music(self):
+        #TODO: is this really working?
         self._play_music()
         self.statusbar['text'] = "Music rewinded"
     
     
     def _set_volume(self, volume):
+        #TODO: is this really working
         self._player.set_volume(volume)
         
     
