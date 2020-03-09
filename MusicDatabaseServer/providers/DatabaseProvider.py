@@ -30,7 +30,7 @@ class Album(BaseModel):
     id = AutoField(column_name='Id')
     copy = CharField(constraints=[SQL("DEFAULT ' '")])
     band = CharField(column_name='groupName', constraints=[SQL("DEFAULT ' '")])
-    loc = CharField(constraints=[SQL("DEFAULT ' '")])
+    country = CharField(column_name='loc', constraints=[SQL("DEFAULT ' '")])
     score = CharField(column_name='mark', constraints=[SQL("DEFAULT ' '")])
     review = TextField(null=True)
     style = CharField(constraints=[SQL("DEFAULT ' '")])
@@ -45,8 +45,8 @@ class Favorites(BaseModel):
     id = AutoField(column_name='Id')
     disc_id = ForeignKeyField(Album, backref='favorites')
     score = FloatField(constraints=[SQL("DEFAULT 0")])
-    track_no = IntegerField(constraints=[SQL("DEFAULT 0")])
-    track_title = CharField()
+    track_number = IntegerField(column_name='track_no', constraints=[SQL("DEFAULT 0")])
+    title = CharField(column_name='track_title')
     file_name = CharField()
     type = TextField(null=True)
 
@@ -76,11 +76,6 @@ def database_mgmt(func):
 
 class DatabaseProvider(object):
     
-    fav_name_map = {'id': 'id', 'disc_id': 'disc_id', 'track_title': 'title', 'file_name': 'file_name', \
-                     'score': 'score', 'track_no': 'track_number', 'type': 'type'}
-    album_name_map = { 'id' : 'id', 'copy' : 'copy', 'band' : 'band', 'loc' : 'country', 'score' : 'score' , \
-                       'review' : 'review', 'style': 'style', 'title': 'title', 'type': 'type', 'year' : 'year' }
-    
     @database_mgmt       
     def _search_song_by_title_and_album_id(self, song_title, album_id):
         result = Favorites.select().where((Favorites.disc_id == album_id) & (Favorites.track_title == song_title))
@@ -91,7 +86,7 @@ class DatabaseProvider(object):
         #get result from database as Peewee model
         result = Favorites.select().where(Favorites.score > score).order_by(fn.Rand()).limit(int(quantity))
         #get results from the query and map the key names to the app_definition response object names
-        list_result = [{DatabaseProvider.fav_name_map[name]: val for name, val in row.items()} for row  in result.dicts()]
+        list_result = [row for row  in result.dicts()]
         logger.debug('Getting result for get_songs: %s', list_result)
         return {'songs' : list_result}
     
@@ -154,7 +149,7 @@ class DatabaseProvider(object):
         else:
             result = Album.select()
         if result:            
-            list_result = [{DatabaseProvider.album_name_map[name]: val for name, val in row.items()} for row in result.dicts()] 
+            list_result = [row for row in result.dicts()] 
             logger.debug('Getting result for get_album: %s', list_result) 
             return list_result,200
         else:
@@ -168,22 +163,23 @@ class DatabaseProvider(object):
         
         album_entry = Album()
         # first copy compulsory fields and validate types
-        try:            
-            album_entry.group_name = album['band']
-            album_entry.title      = album['title']
-            album_entry.year       = int(album['year'])
-        except KeyError as ex:
-            logger.exception('Exception on key when creating album. %s', ex)
+        try:      
+            album_entry.id    = album['id']             
+            album_entry.band  = album['band']
+            album_entry.title = album['title']
+            album_entry.year  = int(album['year'])
+        except KeyError:
+            logger.exception('Exception on key when creating album.')
             return album, 400
-        except ValueError as ex:
-            logger.exception('Exception on value when creating album. %s', ex)
+        except ValueError:
+            logger.exception('Exception on value when creating album.')
             return album, 400
         # now copy optional fields
         try:
-            album_entry.mark     = float(album['score'])   
+            album_entry.score    = float(album['score'])   
             album_entry.review   = album['review']
             album_entry.type     = album['type']
-            album_entry.loc      = album['country']   
+            album_entry.country  = album['country']   
             album_entry.copy     = album['copy']
             album_entry.style    = album['style']  
         except KeyError as ex:
@@ -191,7 +187,8 @@ class DatabaseProvider(object):
         except ValueError as ex:
             logger.warning('Exception on value when creating album %s. %s', album, ex) 
         # save object in database
-        album.save()
+        logger.debug(f'Saving album {album_entry} in database')
+        album_entry.save()
         return album, 200
     
     @database_mgmt
