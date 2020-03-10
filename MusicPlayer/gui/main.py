@@ -3,6 +3,7 @@ import time
 import hashlib
 from os import listdir
 from os.path import basename, dirname, isfile, join
+from functools import partial
 
 import tkinter.messagebox
 from tkinter import *
@@ -78,7 +79,8 @@ class GUI():
         # Create the Albums sub menu            
         self._file_sub_menu = Menu(self._menubar, tearoff=0)
         self._menubar.add_cascade(label="Albums", menu=self._file_sub_menu)
-        self._file_sub_menu.add_command(label="Open List", command=self._show_album_list)
+        album_list_func = partial(self._execute_thread, self._get_album_list_thread, self._show_album_list)
+        self._file_sub_menu.add_command(label="Open List", command=album_list_func)
         # Create the Play sub menu            
         self._play_sub_menu = Menu(self._menubar, tearoff=0)
         self._menubar.add_cascade(label="Play", menu=self._play_sub_menu)
@@ -347,8 +349,39 @@ class GUI():
                                                                      window=self._right_album_frame, 
                                                                      anchor = NW)
 
-        
+    ################### TASKS EXECUTION ######################################################
+    ################### TASKS EXECUTION ######################################################
+    ################### TASKS EXECUTION ######################################################
+    ################### TASKS EXECUTION ######################################################
      
+            
+    def _execute_thread(self, target_thread, post_function, *args):
+        """
+            Function execute tasks in parallel with the GUI main loop.
+            It will start a new thread passed on target_thread and a progressbar to indicate progress
+            Progress update is checked in _check_thread
+        """
+        self._album_collection_thread = threading.Thread(target=target_thread)
+        self._album_collection_thread.daemon = True
+        self._progressbar.start()
+        self._album_collection_thread.start()
+        self._window_root.after(100, self._check_thread, post_function, *args)
+        
+   
+    def _check_thread(self, post_function, *args):
+        """
+            Function to check progress of a thread. It updates a progress bar while working.
+            Once the thread is finished it calls the post_function passed by argument with its arguments.
+        """
+        self._window_root.update()
+        if self._album_collection_thread.is_alive():
+            self._window_root.after(100, self._check_thread, post_function, *args)
+        else:
+            self._progressbar.stop()
+            #call the post function once the thread is finished
+            if post_function:
+                post_function(*args)
+
 
         
     ################### MENU ACTIONS ######################################################
@@ -387,58 +420,43 @@ class GUI():
         '''       
         #get favorite song list according to the parameters
         #TODO: add an infinite loop for quantity and  refresh table 
-        quantity = 5
+        quantity = 10
         questionWindow = self.FavsScoreWindow(self._window_root)
         self._window_root.wait_window(questionWindow.top)
-        try:
-            score = float(questionWindow.score)
-        except ValueError:
-            messagebox.showerror("Error", "Score must be a number between 0 and 10")
-        else:
-            if score < 0.0 or score > 10.0:
-                messagebox.showerror("Error", "Score must be between 0 and 10")
-            else:    
-                try:
-                    #TODO: check why the abs_path is not shown in the playlistbox
-                    songs = AlbumManager.get_favorites(quantity, score)
-                    for song in songs:
-                        self._add_song_to_playlist(song) 
-                except ApiException:
-                    config.logger.exception("Exception when getting favorite songs from the server")
+        if questionWindow.score:
+            try:
+                score = float(questionWindow.score)
+            except ValueError:
+                messagebox.showerror("Error", "Score must be a number between 0 and 10")
+            else:
+                if score < 0.0 or score > 10.0:
+                    messagebox.showerror("Error", "Score must be between 0 and 10")
+                else:    
+                    try:
+                        songs = AlbumManager.get_favorites(quantity, score)
+                        for song in songs:
+                            self._add_song_to_playlist(song) 
+                    except ApiException:
+                        config.logger.exception("Exception when getting favorite songs from the server")
         
             
     ####################### GET THE ALBUM LIST ##################################
-            
+    
+
+                
+                
+    
     def _show_album_list(self):
-        #TODO make this function generic and apply it to the favorites retrieval
-        """Function to get the album list to present in a new window
-        It will start a new thread to get the information from the server and a progressbar to indicate progress
-        Progress update is checked in _check_album_list_thread
-        Thread work is in _show_album_list_thread"""
-        self._album_collection_thread = threading.Thread(target=self._show_album_list_thread)
-        self._album_collection_thread.daemon = True
-        self._progressbar.start()
-        self._album_collection_thread.start()
-        self._window_root.after(100, self._check_album_list_thread)
+        '''
+            Function to be called after the get album list thread
+        '''
+        if self._albums_from_server:
+            self._init_albums_window_layout()
+            self._add_to_album_list(self._albums_from_server)
+        else:                
+            messagebox.showerror("Error", "Error getting album collection. Please check logging.")    
         
-   
-    def _check_album_list_thread(self):
-        """Function to check progress of album list retrieve. It updates a progress bar while working.
-         Once it is done it creates a new window with the results"""
-        self._window_root.update()
-        if self._album_collection_thread.is_alive():
-            self._window_root.after(100, self._check_album_list_thread)
-        else:
-            self._progressbar.stop()
-            #show the results once we received them
-            if self._albums_from_server:
-                self._init_albums_window_layout()
-                self._add_to_album_list(self._albums_from_server)
-            else:                
-                messagebox.showerror("Error", "Error getting album collection. Please check logging.")
-        
-        
-    def _show_album_list_thread(self):
+    def _get_album_list_thread(self):
         """Function to get the album list."""
         try:
             self._albums_from_server = AlbumManager.get_albums_from_collection() 
@@ -587,7 +605,7 @@ class GUI():
         
     def _add_to_album_list(self, album_dict):
         band_index = 1 
-        for band, albums in album_dict.items():
+        for band, albums in sorted(album_dict.items()):
             # add tags for identifying which background color to apply
             if band_index % 2:
                 tags = ('oddrow',)
@@ -618,7 +636,6 @@ class GUI():
                                                    album.in_db))
                 self._albums_list[album_id] = album
                 album_index += 1
-        #TODO: sort results by band name
         # apply background colors
         self._album_listbox.tag_configure('oddrow', background='#D9FFDB')
         self._album_listbox.tag_configure('evenrow', background='#FFE5CD')

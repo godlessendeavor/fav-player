@@ -151,8 +151,6 @@ class AlbumManager:
                                                     found_song = True
                                                     song.abs_path = os.path.join(album.path, file_name)
                                                     song.file_name = file_name
-                                                    print("Appending song")
-                                                    print(song)
                                                     fav_songs.append(song)
                                                     break
                                             if not found_song:
