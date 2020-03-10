@@ -355,7 +355,7 @@ class GUI():
     ################### TASKS EXECUTION ######################################################
      
             
-    def _execute_thread(self, target_thread, post_function, *args):
+    def _execute_thread(self, target_thread, post_function = None, *args):
         """
             Function execute tasks in parallel with the GUI main loop.
             It will start a new thread passed on target_thread and a progressbar to indicate progress
@@ -420,31 +420,35 @@ class GUI():
         '''       
         #get favorite song list according to the parameters
         #TODO: add an infinite loop for quantity and  refresh table 
-        quantity = 10
+        
         questionWindow = self.FavsScoreWindow(self._window_root)
         self._window_root.wait_window(questionWindow.top)
         if questionWindow.score:
             try:
-                score = float(questionWindow.score)
+                self._favs_score = float(questionWindow.score)
             except ValueError:
                 messagebox.showerror("Error", "Score must be a number between 0 and 10")
             else:
-                if score < 0.0 or score > 10.0:
+                if self._favs_score < 0.0 or self._favs_score > 10.0:
                     messagebox.showerror("Error", "Score must be between 0 and 10")
-                else:    
-                    try:
-                        songs = AlbumManager.get_favorites(quantity, score)
-                        for song in songs:
-                            self._add_song_to_playlist(song) 
-                    except ApiException:
-                        config.logger.exception("Exception when getting favorite songs from the server")
+                else:  
+                    self._execute_thread(self._search_favs_thread, self._play_music)                          
+                        
+    def _search_favs_thread(self):
+        '''
+            Thread to search favorite songs and add to the playlist
+        '''
+        try:
+            quantity = 10
+            songs = AlbumManager.get_favorites(quantity, self._favs_score)
+            for song in songs:
+                self._add_song_to_playlist(song) 
+        except ApiException:
+            config.logger.exception("Exception when getting favorite songs from the server")
         
             
     ####################### GET THE ALBUM LIST ##################################
-    
-
-                
-                
+            
     
     def _show_album_list(self):
         '''
@@ -457,7 +461,7 @@ class GUI():
             messagebox.showerror("Error", "Error getting album collection. Please check logging.")    
         
     def _get_album_list_thread(self):
-        """Function to get the album list."""
+        """Function to be called as separate thread to get the album list."""
         try:
             self._albums_from_server = AlbumManager.get_albums_from_collection() 
         except:

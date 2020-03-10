@@ -10,15 +10,6 @@ from mp3_tagger import MP3File
 from music.album import Album
 from musicdb_client.models.song import Song as DB_song
 from config import config
-import logging
-#set log configuration
-log_level = logging.getLevelName(config.LOGGING_LEVEL)
-
-logging.basicConfig(
-    format='[%(asctime)-15s] [%(name)s] %(levelname)s]: %(message)s',
-    level=log_level
-)
-logger = logging.getLogger(__name__)
 
 class Song(DB_song):
     '''
@@ -69,8 +60,11 @@ class Song(DB_song):
     
     @abs_path.setter
     def abs_path(self, path):
-        self.update_song_data_from_file(path)
-        self._abs_path = path
+        try:
+            self.update_song_data_from_file(path)
+            self._abs_path = path
+        except:
+            config.logger.exception(f'Could not set absolute path for song in {path}')
 
     
     def update_song_data_from_file(self, song_path):
@@ -84,7 +78,7 @@ class Song(DB_song):
                 audio = MP3(song_path)
                 total_length = audio.info.length
             except MutagenError as ex:
-                logger.exception('Error when trying to get MP3 information.')
+                config.logger.exception(f'Error when trying to get MP3 information for song in {song_path}')
                 raise ex
             else:                
                 # div - total_length/60, mod - total_length % 60
