@@ -142,24 +142,26 @@ class AlbumManager:
                                         song.album = album     
                                         found_song = False             
                                         #search for the song in the album path
-                                        for root, dirs, files in os.walk(album.path):
+                                        for folder, dirs, files in os.walk(album.path):
                                             for file_name in files:
                                                 #TODO: change the next check for a check against the file_name
                                                 #right now it's not stored in the database but it should
                                                 #if file == song.file_name:                                
                                                 if song.title in file_name:
                                                     found_song = True
-                                                    song.abs_path = os.path.join(album.path, file_name)
+                                                    song.abs_path = os.path.join(folder, file_name)
                                                     song.file_name = file_name
                                                     fav_songs.append(song)
                                                     break
                                             if not found_song:
-                                                songs_logger.info(f'Song with title {song.title} from album title \
-                                                                 {song.album.title} and band {song.album.band} not found among the \
-                                                                 files of the corresponding album')
+                                                songs_logger.info(f'Song with title {song.title} from album title '
+                                                                 f'{song.album.title} and band {song.album.band} not found among the '
+                                                                 f'files of the corresponding album')
                                         break   
                                 if not found_album:
                                     songs_logger.info(f"Album with database id {db_album.id} could not be found in database for song {db_song.title}")       
+                            else:
+                                songs_logger.info(f"Band {db_album.band} not found in the list of bands")       
                         else:
                             config.logger.error(f'Found too many albums ({len(db_albums) }) with id {db_song.disc_i}')
         config.logger.debug(f"returning {fav_songs}")
