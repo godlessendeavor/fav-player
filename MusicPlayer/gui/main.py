@@ -7,7 +7,7 @@ from functools import partial
 
 import tkinter.messagebox
 from tkinter import *
-#from tkinter import filedialog
+from tkinter import filedialog
 from tkinter import ttk
 from ttkthemes import themed_tk as tk
 from PIL import ImageTk, Image as PILImage
@@ -185,11 +185,13 @@ class GUI():
         self._volume_button.grid(row=0, column=1)        
         self._volume_scale = ttk.Scale(self._bottom_right_frame, from_=0, to=100, orient=HORIZONTAL, command=self._set_volume)
         self._volume_scale.grid(row=0, column=2, pady=15, padx=30)     
+        # initialize to maximum
+        self._volume_scale.set(100)
         
         self._progressbar = ttk.Progressbar(self._middle_right_frame, mode='indeterminate')
         self._progressbar.grid(row=1, column=1, sticky=W, pady=15)   
         
-        #start the gui loop
+        # start the gui loop
         self._window_root.mainloop()
         
     
@@ -212,7 +214,7 @@ class GUI():
         self._selected_album = None
         self._selected_album_review_signature = None
                              
-        #ALBUM WINDOW FRAMES STRUCTURE
+        # ALBUM WINDOW FRAMES STRUCTURE
         
         self._top_album_frame = Frame(self._albums_window)
         self._top_album_frame.pack(side=TOP, expand=True)
@@ -222,8 +224,7 @@ class GUI():
         
         self._right_album_frame = Frame(self._top_album_frame)
         self._right_album_frame.pack(side=RIGHT, padx=30, pady=30, expand=True)
-               
-        #TODO: add review to this frame
+
         self._bottom_album_frame = Frame(self._albums_window)
         self._bottom_album_frame.pack(side=BOTTOM, expand=True)
         
@@ -293,7 +294,7 @@ class GUI():
             try:
                 album = self._albums_list[selection]
             except KeyError:
-                #if selected row is from the band root then we do not continue
+                # if selected row is from the band root then we do not continue
                 pass
             else:
                 # if there was a previous album let's check if we have to update the review
@@ -303,10 +304,11 @@ class GUI():
                         config.logger.info(f"Review for album {self._selected_album.title} has changed. Updating the DB.")
                         self._selected_album.review = review
                         try:
-                # TODO: save the review also when the window is closed. There might not be a new album selection!
+                # TODO: test the save the review also when the window is closed. There might not be a new album selection!
                             AlbumManager.update_album(self._selected_album)
-                        except:
-                            messagebox.showerror(message='Could not save album. See log for errors.')
+                        except Exception as ex:
+                            config.logger.exception('Could not save album review.')
+                            messagebox.showerror('Error',message='Could not save album review. See log for errors.')
                         
                 # set the review text
                 self._review_text_box.delete(1.0, END)   
@@ -438,13 +440,18 @@ class GUI():
         '''
             Thread to search favorite songs and add to the playlist
         '''
+        self.statusbar['text'] = 'Getting favorite songs'
         try:
             quantity = 10
             songs = AlbumManager.get_favorites(quantity, self._favs_score)
             for song in songs:
                 self._add_song_to_playlist(song) 
+            self.statusbar['text'] = 'Favorite songs ready!'
         except ApiException:
             config.logger.exception("Exception when getting favorite songs from the server")
+            messagebox.showerror("Error", "Some error while searching for favorites. Please see logging")
+        except Exception:
+            messagebox.showerror("Error", "Some error while searching for favorites. Please check the connection to the server.")
         
             
     ####################### GET THE ALBUM LIST ##################################
@@ -457,11 +464,15 @@ class GUI():
         if self._albums_from_server:
             self._init_albums_window_layout()
             self._add_to_album_list(self._albums_from_server)
+            self.statusbar['text'] = 'Album list ready'
         else:                
             messagebox.showerror("Error", "Error getting album collection. Please check logging.")    
         
     def _get_album_list_thread(self):
-        """Function to be called as separate thread to get the album list."""
+        """
+            Function to be called as separate thread to get the album list.
+        """
+        self.statusbar['text'] = 'Getting album list'
         try:
             self._albums_from_server = AlbumManager.get_albums_from_collection() 
         except:
@@ -475,7 +486,7 @@ class GUI():
 
     def _playlistbox_add_to_favorites(self):
         '''
-            Function to add the selected song from the playlist to the favorites in the server.
+            Adds the selected song from the playlist to the favorites in the server.
         '''
         song = self._playlist[self._playlist_popup.selection] 
         try:
@@ -488,7 +499,7 @@ class GUI():
          
     def _delete_song(self):
         '''
-            Function to delete the selected song from the playlist.
+            Deletes the selected song from the playlist.
             It does not remove it from the server even if it's a favorite song.
         '''
         selected_songs = self._playlistbox.selection()
@@ -502,11 +513,12 @@ class GUI():
             Plays the list of songs from the playlistbox. 
             It will start on the selected song from the playlist.
         '''
-        if self._paused:            
+        if self._paused and not file_list:            
             self._player.pause()
             self.statusbar['text'] = "Music Resumed"
             self._paused = FALSE
         else:
+            #TODO: check why playing songs are not continuously
             try:
                 if not file_list:
                     selected_songs_list = self._playlistbox.selection()
@@ -516,9 +528,14 @@ class GUI():
                         file_list = [song.abs_path for song in self._playlist.values()]
          
                 self._player.play_list(file_list)
+                
             except Exception:
                 config.logger.exception('Exception while playing music') 
-                tkinter.messagebox.showerror('File not found', 'Player could not find the file. Please check again.')
+                messagebox.showerror('File not found', 'Player could not play the file. Please check logging.')
+            else:
+                self._paused = FALSE
+                self.statusbar['text'] = "Music playing"
+                
 
     def _stop_music(self):   
         '''
@@ -566,17 +583,36 @@ class GUI():
         
         
     ####################### GUI EVENTS #################################
+    
     def _on_closing(self):
+        '''
+            Event called on closing the main window.
+            It will stop the music and destroy any existing window.
+        '''
         self._stop_music()
         self._stop_details_thread = True
-        try:
-            self._albums_window.destroy()
-        except:
-            pass
+        self._on_closing_album_window()
         self._window_root.destroy()
         
-    def _on_closing_album_window(self):        
-        self._albums_window.destroy()
+    def _on_closing_album_window(self): 
+        '''
+           Event called on albums window closure.
+           It will save the latest modified review if any.
+        ''' 
+        if hasattr(self, '_selected_album') and self._selected_album:      
+            review = self._review_text_box.get(1.0, END)
+            if self._selected_album_review_signature != get_signature(review):
+                config.logger.info(f"Review for album {self._selected_album.title} has changed. Updating the DB.")
+                self._selected_album.review = review
+            try:
+                AlbumManager.update_album(self._selected_album)
+            except Exception as ex:
+                config.logger.exception('Could not save album review.')
+        if hasattr(self, '_albums_window'):
+            try:   
+                self._albums_window.destroy()
+            except:
+                config.logger.exception('Could not close album window.')
   
         
     ######################### FUNCTION HELPERS #####################

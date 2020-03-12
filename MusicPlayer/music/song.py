@@ -52,6 +52,8 @@ class Song(DB_song):
     
     @property
     def total_length(self):
+        if not self._seconds:
+            self._seconds = 0
         return str(self.minutes) + ":" + format(self.seconds, '02d')
     
     @property

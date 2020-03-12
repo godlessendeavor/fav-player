@@ -88,7 +88,6 @@ class AlbumManager:
                 if band_key in res_tree:
                     for key, album_obj in res_tree[band_key].items():
                         if album_obj.title.casefold() == db_album.title.casefold():
-                            #TODO: check why location is none
                             album_obj.merge(db_album)
                             album_obj.in_db = True   
                             break
@@ -119,7 +118,11 @@ class AlbumManager:
         """
         fav_songs = []
         #get a list from the database with the favorite songs
-        result = cls._musicdb.api_songs_get_songs(quantity = quantity, score = score)
+        try:
+            result = cls._musicdb.api_songs_get_songs(quantity = quantity, score = score)
+        except Exception as ex:
+           config.logger.exception('Exception when getting favorite songs')
+           raise(ex) 
         if result:            
             if isinstance(result.songs, list):
                 #get albums from collection to search for this song
@@ -147,7 +150,7 @@ class AlbumManager:
                                                 #TODO: change the next check for a check against the file_name
                                                 #right now it's not stored in the database but it should
                                                 #if file == song.file_name:                                
-                                                if song.title in file_name:
+                                                if song.title in file_name and 'mp3' in file_name:
                                                     found_song = True
                                                     song.abs_path = os.path.join(folder, file_name)
                                                     song.file_name = file_name
