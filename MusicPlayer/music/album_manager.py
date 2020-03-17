@@ -129,7 +129,11 @@ class AlbumManager:
                 albums_dict = cls.get_albums_from_collection()
                 #for every song in the database result search the album info in the database
                 for db_song in result.songs:
-                    db_albums = cls._musicdb.api_albums_get_albums(album_id = db_song.disc_id)
+                    try:
+                        db_albums = cls._musicdb.api_albums_get_albums(album_id = db_song.disc_id)
+                    except Exception as ex:
+                        config.logger.exception(f'Could not get album with id {db_song.disc_id}')
+                        continue
                     #make sure it's only one
                     if isinstance(db_albums, list):
                         if len(db_albums) == 1:

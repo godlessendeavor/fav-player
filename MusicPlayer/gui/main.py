@@ -32,6 +32,7 @@ class GUI():
        
     def __init__(self):
         self._player = MyMediaPlayer()
+        self._player.subscribe_song_finished(self._player_song_finished_event)
         self._paused = FALSE          
         self._muted  = FALSE
         self._playlist = {}   #dictionary containing the song objects of the playlist  
@@ -277,7 +278,10 @@ class GUI():
                 self._album_list_popup.grab_release()  
                            
                 
-        def do_album_list_play_album():                         
+        def do_album_list_play_album(): 
+            '''
+                Plays selected album on popup
+            '''                        
             row = self._album_list_popup.selection
             album = self._albums_list[row]            
             file_names = [f for f in listdir(album.path) if isfile(join(album.path, f))]
@@ -304,7 +308,7 @@ class GUI():
                         config.logger.info(f"Review for album {self._selected_album.title} has changed. Updating the DB.")
                         self._selected_album.review = review
                         try:
-                # TODO: test the save the review also when the window is closed. There might not be a new album selection!
+                # TODO: test the save the review also when the window is closed. 
                             AlbumManager.update_album(self._selected_album)
                         except Exception as ex:
                             config.logger.exception('Could not save album review.')
@@ -527,7 +531,7 @@ class GUI():
                     else:
                         file_list = [song.abs_path for song in self._playlist.values()]
          
-                self._player.play_list(file_list)
+                self._player.play(file_list)
                 
             except Exception:
                 config.logger.exception('Exception while playing music') 
@@ -565,7 +569,6 @@ class GUI():
     
     
     def _set_volume(self, volume):
-        #TODO: is this really working
         self._player.set_volume(volume)
         
     
@@ -613,7 +616,15 @@ class GUI():
                 self._albums_window.destroy()
             except:
                 config.logger.exception('Could not close album window.')
+                
+    ####################### PLAYER EVENTS #################################
   
+    def _player_song_finished_event(self):
+        time.sleep(0.1)
+        print('Player event on GUI')
+        self._player.get_mp3_info()
+        if self._player.is_playing():
+            print('Player continued to play')
         
     ######################### FUNCTION HELPERS #####################
     
@@ -633,14 +644,14 @@ class GUI():
                 album_title = ""
             pl_index = self._playlistbox.insert("", index, text="Band Name", 
                                      values=(file_name, song.title, song.band, album_title, song.total_length)) 
-            #add song to playlist dictionary, the index is the index in the playlist 
+            # add song to playlist dictionary, the index is the index in the playlist 
             self._playlist[pl_index] = song
             
     def _add_song_to_playlist(self, song):
         index = 1         
         pl_index = self._playlistbox.insert("", index, text="Band Name", 
                                      values=(song.file_name, song.title, song.band, song.album.title, song.total_length)) 
-        #add song to playlist dictionary, the index is the index in the playlist 
+        # add song to playlist dictionary, the index is the index in the playlist 
         self._playlist[pl_index] = song
         
     def _add_to_album_list(self, album_dict):
@@ -660,11 +671,11 @@ class GUI():
                                                    "", 
                                                    "", 
                                                    ""), tags=tags)
-            #config.logger.debug(f"Adding band {band} from {band_root}")
+            # config.logger.debug(f"Adding band {band} from {band_root}")
             band_index += 1            
             album_index = 1 
             for album_key, album in albums.items():
-                #config.logger.debug(f"Adding album {album} to band {band}")                
+                # config.logger.debug(f"Adding album {album} to band {band}")                
                 album_id = self._album_listbox.insert(band_root, album_index, 
                                            values=("", 
                                                    album.title, 
