@@ -1,4 +1,4 @@
-from vlc import Instance, MediaPlayer, MediaListPlayer, MediaList, EventType
+from vlc import Instance, MediaPlayer, MediaListPlayer, MediaList, EventType, State
 
 from config import config
 import time
@@ -11,7 +11,7 @@ def check_media(func):
     
     def inner(self, *args, **kwargs):
         if hasattr(self, "_media"):
-            if self._media:
+            if not self._media:
                 config.logger.debug(f"Can't call Media Player without setting a file or a file list first. Called from {func}")
                 # TODO: raise exception or print error?
                 # raise ValueError
@@ -43,7 +43,7 @@ class MyMediaPlayer(object):
         '''
             Event for when a player finishes a song.
         '''
-        print(f'Event happened {event}')
+        config.logging.debug(f'Event from VLC player: {event}')
         if self._song_changed_func:
             self._song_changed_func()
             
@@ -57,15 +57,27 @@ class MyMediaPlayer(object):
         # stop any current play
         self.stop() 
         if isinstance(media, str):
-            media = ([media])       
+            media = ([media])  
+        elif not isinstance(media, list):
+            config.logger.error(f'Wrong type passed to play {type(media)}')
+            return    
                   
         _media_list = self._vlc_instance.media_list_new(media)                 
-        mlp = MediaListPlayer()
+        self._mlp = MediaListPlayer()
         self._media = MediaPlayer()
-        mlp.set_media_player(self._media)  
-        mlp.set_media_list(_media_list)
+        self._mlp.set_media_player(self._media)  
+        self._mlp.set_media_list(_media_list)
         self._media.event_manager().event_attach(EventType.MediaPlayerEndReached, self.check_event)        
-        mlp.play()              
+        self._mlp.play()
+        time.sleep(1)
+        pass  
+        
+    
+    def play_at(self, index):
+        '''
+            Play the track at given index.
+        '''
+        self._mlp.play_item_at_index(index)           
 
      
     @check_media    
@@ -105,7 +117,7 @@ class MyMediaPlayer(object):
         '''
             Checks if any media is playing.
         '''
-        return self._media.is_playing()
+        return self._mlp.get_state() == State.Playing 
    
     @check_media 
     def get_length(self):
@@ -115,7 +127,7 @@ class MyMediaPlayer(object):
         return self._media.get_duration()
     
     @check_media
-    def get_mp3_info(self):
+    def get_track_info(self):
         '''
             Gets the info from the mp3 playing currently
         '''

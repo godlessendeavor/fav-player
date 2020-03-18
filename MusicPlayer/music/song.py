@@ -94,15 +94,16 @@ class Song(DB_song):
                     tags = mp3_file.get_tags()
                     
                     tagsv2 = tags['ID3TagV2']
-                    
-                    if not self._band:
-                        self._band = tagsv2['artist']
-                    if not self._album:
-                        self._album = tagsv2['album']
-                    if not self._title:
-                        self._title = tagsv2['song']
                 except Exception:
-                    logger.exception("Some exception occurred while reading MP3 tags.")
+                    config.logger.exception("Some exception occurred while reading MP3 tags.")
+                else:  
+                    if not self._band and 'artist' in tagsv2:
+                        self._band = tagsv2['artist']
+                    if not self._album and 'album' in tagsv2:
+                        self._album = tagsv2['album']
+                    if not self._title and 'song' in tagsv2:
+                        self._title = tagsv2['song']
+                
         else:
             raise Exception(f"File {song_path} is not MP3.")
         

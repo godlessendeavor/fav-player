@@ -140,9 +140,15 @@ class GUI():
                 # make sure to release the grab (Tk 8.0a1 only)
                 self._playlist_popup.grab_release()  
                 
-        def do_playlist_play_song(event):                         
+        def do_playlist_play_song(event):  
+            '''    
+                Play item on double click.
+            '''                       
             row = self._playlistbox.identify_row(event.y)
-            self._play_music([(self._playlist[str(row)]).abs_path])
+            if self._player.is_playing():
+                self._player.play_at(row)
+            else:
+                self._play_music([(self._playlist[str(row)]).abs_path])
              
                 
         #add popup to playlist treeview        
@@ -175,15 +181,13 @@ class GUI():
         self._play_button   = Button(self._middle_right_frame,       image=self._play_photo,   borderwidth=3, command=self._play_music)
         self._stop_button   = Button(self._middle_right_frame,       image=self._stop_photo,   borderwidth=3, command=self._stop_music)
         self._pause_button  = Button(self._middle_right_frame,       image=self._pause_photo,  borderwidth=3, command=self._pause_music)
-        self._rewind_button = Button(self._bottom_right_frame, image=self._rewind_photo, borderwidth=3, command=self._rewind_music)
         self._volume_button = Button(self._bottom_right_frame, image=self._volume_photo, borderwidth=3, command=self._mute_music)
  
         self._play_button.grid(row=0, column=0, padx=10)        
         self._stop_button.grid(row=0, column=1, padx=10)        
         self._pause_button.grid(row=0, column=2, padx=10)
-        
-        self._rewind_button.grid(row=0, column=0)        
-        self._volume_button.grid(row=0, column=1)        
+             
+        self._volume_button.grid(row=0, column=0)        
         self._volume_scale = ttk.Scale(self._bottom_right_frame, from_=0, to=100, orient=HORIZONTAL, command=self._set_volume)
         self._volume_scale.grid(row=0, column=2, pady=15, padx=30)     
         # initialize to maximum
@@ -560,19 +564,19 @@ class GUI():
         else:
             self._paused = TRUE            
             self.statusbar['text'] = "Music paused"
-    
-    
-    def _rewind_music(self):
-        #TODO: is this really working?
-        self._play_music()
-        self.statusbar['text'] = "Music rewinded"
-    
+   
     
     def _set_volume(self, volume):
+        '''
+            Sets the volume of the player.
+        '''
         self._player.set_volume(volume)
         
     
     def _mute_music(self):
+        '''
+            Toggles the player sound.
+        '''
         if self._muted:  # Unmute the music
             self._player.set_volume(1)
             self._volume_button.configure(image=self._volume_photo)
@@ -620,9 +624,10 @@ class GUI():
     ####################### PLAYER EVENTS #################################
   
     def _player_song_finished_event(self):
+        # TODO: finish
         time.sleep(0.1)
         print('Player event on GUI')
-        self._player.get_mp3_info()
+        self._player.get_track_info()
         if self._player.is_playing():
             print('Player continued to play')
         
