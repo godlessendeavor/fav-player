@@ -148,7 +148,7 @@ class GUI():
             if self._player.is_playing():
                 self._player.play_at(row)
             else:
-                self._play_music([(self._playlist[str(row)]).abs_path])
+                self._play_music([(self._playlist[str(row)])])
              
                 
         #add popup to playlist treeview        
@@ -516,31 +516,31 @@ class GUI():
             self._playlistbox.delete(selected_song)
             self._playlist.pop(selected_song)
             
-    def _play_music(self, file_list = None):
+    def _play_music(self, song_list = None):
         '''
             Plays the list of songs from the playlistbox. 
             It will start on the selected song from the playlist.
         '''
-        if self._paused and not file_list:            
+        if self._paused and not song_list:            
             self._player.pause()
             self.statusbar['text'] = "Music Resumed"
             self._paused = FALSE
         else:
-            #TODO: check why playing songs are not continuously
             try:
-                if not file_list:
+                if not song_list:
                     selected_songs_list = self._playlistbox.selection()
                     if selected_songs_list:
-                        file_list = [(self._playlist[str(index_song)]).abs_path for index_song in selected_songs_list]
+                        song_list = [self._playlist[str(index_song)] for index_song in selected_songs_list]
                     else:
-                        file_list = [song.abs_path for song in self._playlist.values()]
-         
-                self._player.play(file_list)
+                        pass
+                        # TODO: playlist has already been provided, check that
+                self._player.play(song_list)
                 
             except Exception:
                 config.logger.exception('Exception while playing music') 
                 messagebox.showerror('File not found', 'Player could not play the file. Please check logging.')
             else:
+                self._show_details()
                 self._paused = FALSE
                 self.statusbar['text'] = "Music playing"
                 
@@ -624,12 +624,13 @@ class GUI():
     ####################### PLAYER EVENTS #################################
   
     def _player_song_finished_event(self):
-        # TODO: finish
-        time.sleep(0.1)
-        print('Player event on GUI')
-        self._player.get_track_info()
-        if self._player.is_playing():
-            print('Player continued to play')
+        '''
+            Event called when a song is finished
+        '''
+        song = self._player.get_current_song()
+        if song:
+            self.statusbar['text'] = f'Playing: {song.title}'
+            
         
     ######################### FUNCTION HELPERS #####################
     
@@ -653,11 +654,15 @@ class GUI():
             self._playlist[pl_index] = song
             
     def _add_song_to_playlist(self, song):
+        '''
+            Adds song to GUI playlist and to the player.
+        '''
         index = 1         
         pl_index = self._playlistbox.insert("", index, text="Band Name", 
                                      values=(song.file_name, song.title, song.band, song.album.title, song.total_length)) 
         # add song to playlist dictionary, the index is the index in the playlist 
         self._playlist[pl_index] = song
+        self._player.append_to_playlist([song])
         
     def _add_to_album_list(self, album_dict):
         band_index = 1 
@@ -701,6 +706,7 @@ class GUI():
 
     def _start_count(self, stop_thread):
         while stop_thread():
+            print('afgrhdeyh')
             #TODO: why it is not returning true when it should?
             while self._player.is_playing():     
                 print("counting ")

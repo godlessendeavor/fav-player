@@ -13,7 +13,7 @@ from config import config
 
 class Song(DB_song):
     '''
-    This is the model for songs in the Music Player
+        This is the model for songs in the Music Player
     '''
     
     def __init__(self, song : DB_song = None):

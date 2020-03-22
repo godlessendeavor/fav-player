@@ -1,7 +1,7 @@
 from vlc import Instance, MediaPlayer, MediaListPlayer, MediaList, EventType, State
 
 from config import config
-import time
+from music.song import Song
 
 
 def check_media(func):
@@ -29,6 +29,8 @@ class MyMediaPlayer(object):
     
     def __init__(self):
         self._vlc_instance = Instance()
+        self._volume = 100
+        self._song_list = []
         self._song_changed_func = None
         
     def subscribe_song_finished(self, func, *args, **kwargs):
@@ -37,69 +39,82 @@ class MyMediaPlayer(object):
         '''
         self._song_changed_func = func
         
-        
-    #TODO: change function name and add a subscriber for the GUI
-    def check_event(self, event):
+    def finished_song_event(self, event):
         '''
             Event for when a player finishes a song.
         '''
         config.logging.debug(f'Event from VLC player: {event}')
+        self._play_next()
         if self._song_changed_func:
             self._song_changed_func()
             
-    def play(self, media):  
+    def play(self, song_list = None):  
         '''
-            Plays the given file. (
-            media can be 
-             - an absolute path or
-             - a list of files given in flist
-        '''   
-        # stop any current play
-        self.stop() 
-        if isinstance(media, str):
-            media = ([media])  
-        elif not isinstance(media, list):
-            config.logger.error(f'Wrong type passed to play {type(media)}')
-            return    
-                  
-        _media_list = self._vlc_instance.media_list_new(media)                 
-        self._mlp = MediaListPlayer()
-        self._media = MediaPlayer()
-        self._mlp.set_media_player(self._media)  
-        self._mlp.set_media_list(_media_list)
-        self._media.event_manager().event_attach(EventType.MediaPlayerEndReached, self.check_event)        
-        self._mlp.play()
-        time.sleep(1)
-        pass  
+            Plays the given song list (a list of Song objects).
+        '''  
+        if not self._song_list and not song_list:
+            config.logger.error(f'A playlist needs to be provided before playing.')
+            return
+        if song_list:
+            if not isinstance(song_list, list):
+                config.logger.error(f'Wrong type passed to play {type(song_list)}.')
+                return   
+            if len(song_list) < 1:
+                config.logger.error(f'Not enough items to play.')
+                return          
+            self._song_list = song_list
         
-    
-    def play_at(self, index):
+        # stop any current play
+        self.stop()    
+        self._current_index = -1             
+        # start playing the first song
+        self._play_next()
+        
+    def append_to_playlist(self, song_list):
         '''
-            Play the track at given index.
+            Appends a list to the existing playlist
         '''
-        self._mlp.play_item_at_index(index)           
-
+        if not isinstance(song_list, list):
+            config.logger.error(f'Wrong type passed to play {type(song_list)}')
+            return   
+        self._song_list.extend(song_list)
+        
+    def _play_next(self): 
+        '''
+            Plays the next song in the list
+        '''   
+        self._current_index += 1
+        if len(self._song_list) > self._current_index: 
+            self._media = self._vlc_instance.media_new(self._song_list[self._current_index].abs_path)  
+            self._player = self._vlc_instance.media_player_new()  
+            self._player.set_media(self._media)  
+            self._player.event_manager().event_attach(EventType.MediaPlayerEndReached, self.finished_song_event) 
+            self._player.audio_set_volume(self._volume) 
+            self._player.play()
+        else:
+            config.logger.debug('Finished playing the list of songs')
+            
      
     @check_media    
     def stop(self):
         '''
             Stops the player.
         '''
-        self._media.stop()
+        self._player.stop()
     
     @check_media 
     def pause(self):
         '''
             Pauses and resumes the music.
         '''
-        self._media.pause()
+        self._player.pause()
     
     @check_media    
     def get_time(self):
         '''
             Gets the elapsed time of the current song.
         '''
-        return self._media.get_time()
+        return self._player.get_time()
     
     @check_media 
     def set_volume(self, volume):
@@ -110,29 +125,32 @@ class MyMediaPlayer(object):
             volume = float(volume)
         if isinstance(volume, (float, int)):
             volume = int(round(volume))
-        self._media.audio_set_volume(volume)
+        self._volume = volume
+        self._player.audio_set_volume(volume)
     
     @check_media     
     def is_playing(self):
         '''
             Checks if any media is playing.
         '''
-        return self._mlp.get_state() == State.Playing 
+        return self._player.get_state() == State.Playing 
    
     @check_media 
     def get_length(self):
         '''
             Gets the length of the current media playing.
         '''
-        return self._media.get_duration()
+        return self._player.get_duration()
     
     @check_media
-    def get_track_info(self):
+    def get_current_song(self):
         '''
             Gets the info from the mp3 playing currently
         '''
-        # TODO
-        pass
+        song = None
+        if self._current_index < len(self._song_list):
+            song = self._song_list[self._current_index]
+        return song
             
             
         
