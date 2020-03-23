@@ -2,6 +2,7 @@ from vlc import Instance, MediaPlayer, MediaListPlayer, MediaList, EventType, St
 
 from config import config
 from music.song import Song
+import functools
 
 
 def check_media(func):
@@ -31,22 +32,52 @@ class MyMediaPlayer(object):
         self._vlc_instance = Instance()
         self._volume = 100
         self._song_list = []
-        self._song_changed_func = None
+        self._song_finished_func      = None
+        self._song_started_func       = None
+        self._playlist_finished_func  = None
         
     def subscribe_song_finished(self, func, *args, **kwargs):
         '''
             Subscriber for when player finishes a song
         '''
-        self._song_changed_func = func
+        self._song_finished_func = functools.partial(func, *args, **kwargs)
         
-    def finished_song_event(self, event):
+    def subscribe_playlist_finished(self, func, *args, **kwargs):
+        '''
+            Subscriber for when player finishes all songs in existing playlist
+        '''
+        self._playlist_finished_func = functools.partial(func, *args, **kwargs)
+        
+    def subscribe_song_started(self, func, *args, **kwargs):
+        '''
+            Subscriber for when player finishes a song
+        '''
+        self._song_started_func = functools.partial(func, *args, **kwargs)
+        
+    def _finished_song_event(self, event):
         '''
             Event for when a player finishes a song.
         '''
         config.logging.debug(f'Event from VLC player: {event}')
         self._play_next()
-        if self._song_changed_func:
-            self._song_changed_func()
+        if self._song_finished_func:
+            self._song_finished_func()
+            
+    def _finished_playlist_event(self):
+        '''
+            Event for when a player finishes a song.
+        '''
+        config.logging.debug(f'Finished playlist event')
+        if self._playlist_finished_func:
+            self._playlist_finished_func()
+            
+    def _started_song_event(self, event):
+        '''
+            Event for when a player starts a song.
+        '''
+        config.logging.debug(f'Event from VLC player: {event}')
+        if self._song_started_func:
+            self._song_started_func()
             
     def play(self, song_list = None):  
         '''
@@ -88,10 +119,12 @@ class MyMediaPlayer(object):
             self._media = self._vlc_instance.media_new(self._song_list[self._current_index].abs_path)  
             self._player = self._vlc_instance.media_player_new()  
             self._player.set_media(self._media)  
-            self._player.event_manager().event_attach(EventType.MediaPlayerEndReached, self.finished_song_event) 
+            self._player.event_manager().event_attach(EventType.MediaPlayerEndReached, self._finished_song_event) 
+            self._player.event_manager().event_attach(EventType.MediaPlayerPlaying, self._started_song_event) 
             self._player.audio_set_volume(self._volume) 
             self._player.play()
         else:
+            self._finished_playlist_event()
             config.logger.debug('Finished playing the list of songs')
             
      
@@ -114,7 +147,9 @@ class MyMediaPlayer(object):
         '''
             Gets the elapsed time of the current song.
         '''
-        return self._player.get_time()
+        time = self._player.get_time()
+        time_str = str(int(time / 60000)) + ':' + format(int((time % 60000)/1000), '02d') 
+        return time_str
     
     @check_media 
     def set_volume(self, volume):

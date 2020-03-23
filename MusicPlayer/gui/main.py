@@ -32,13 +32,14 @@ class GUI():
        
     def __init__(self):
         self._player = MyMediaPlayer()
-        self._player.subscribe_song_finished(self._player_song_finished_event)
+        self._player.subscribe_song_started(self._player_song_started_event)
+        self._player.subscribe_playlist_finished(self._player_playlist_finished_event)
         self._paused = FALSE          
         self._muted  = FALSE
         self._playlist = {}   #dictionary containing the song objects of the playlist  
         self._albums_list = {} #dictionary containing the album objects for the album list
         self._albums_from_server = {} #preliminary dictionary containing the data from the server, to be processed to _albums_list
-        self._details_thread = threading.Thread(target=self._start_count, args =(lambda : self._stop_details_thread, ))
+        self._details_thread = threading.Thread(target=self._start_count)
         self._stop_details_thread = False
         #get the client to access the music_db server
         self._musicdb = config._musicdb_api
@@ -550,6 +551,7 @@ class GUI():
             Stops playing music.
         '''     
         self._player.stop()
+        self._stop_details_thread = True
         self.statusbar['text'] = "Music stopped"
     
     
@@ -623,13 +625,21 @@ class GUI():
                 
     ####################### PLAYER EVENTS #################################
   
-    def _player_song_finished_event(self):
+    def _player_song_started_event(self):
         '''
-            Event called when a song is finished
+            Event called when a song is started
         '''
         song = self._player.get_current_song()
         if song:
             self.statusbar['text'] = f'Playing: {song.title}'
+            
+    def _player_playlist_finished_event(self):
+        '''
+            Event called when the playlist is finished. 
+            It will call more favorite songs to play.
+        '''
+        if self._favs_score:
+            self._execute_thread(self._search_favs_thread, self._play_music)
             
         
     ######################### FUNCTION HELPERS #####################
@@ -702,14 +712,17 @@ class GUI():
         self._album_listbox.tag_configure('evenrow', background='#FFE5CD')
         
     def _show_details(self):
+        '''
+            Starts the player time details thread 
+        '''
         self._details_thread.start()
 
-    def _start_count(self, stop_thread):
-        while stop_thread():
-            print('afgrhdeyh')
-            #TODO: why it is not returning true when it should?
-            while self._player.is_playing():     
-                print("counting ")
+    def _start_count(self):
+        '''
+            Implementation of timer details thread
+        '''
+        while not self._stop_details_thread:
+            while self._player.is_playing():    
                 self._current_time_label['text'] = "Current Time" + ' - ' + self._player.get_time()
                 time.sleep(1)
             time.sleep(1)
@@ -720,7 +733,7 @@ class GUI():
         Function to sort the columns of a treeview when headings are clicked.
         @param: treeview, the treeview to sort
         @param: col, the column to sort
-        @reverse: parameter to specify if it has to be sorted in reverse.        
+        @param: reverse, parameter to specify if it has to be sorted in reverse.        
         '''
         l = [(treeview.set(k, col), k) for k in treeview.get_children('')]
         l.sort(reverse=reverse)
