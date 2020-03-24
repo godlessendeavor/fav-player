@@ -325,8 +325,7 @@ class GUI():
                     self._review_text_box.insert(END, album.review)
                     self._selected_album_review_signature = get_signature(self._review_text_box.get(1.0, END))
                 #update selected album
-                self._selected_album = album
-                
+                self._selected_album = album    
                 
                 #TODO: load image asynchronously and perhaps move this to another module
                 #That module should look for a cover art from musicbrainz if not found here
@@ -428,10 +427,7 @@ class GUI():
     def _play_favs(self): 
         '''
             Function to play the favorite songs
-        '''       
-        #get favorite song list according to the parameters
-        #TODO: add an infinite loop for quantity and  refresh table 
-        
+        '''               
         questionWindow = self.FavsScoreWindow(self._window_root)
         self._window_root.wait_window(questionWindow.top)
         if questionWindow.score:
@@ -513,9 +509,9 @@ class GUI():
         '''
         selected_songs = self._playlistbox.selection()
         if selected_songs:
-            selected_song = selected_songs[0]        
-            self._playlistbox.delete(selected_song)
-            self._playlist.pop(selected_song)
+            for selected_song in selected_songs:      
+                self._playlistbox.delete(selected_song)
+                self._playlist.pop(selected_song)
             
     def _play_music(self, song_list = None):
         '''
@@ -535,11 +531,11 @@ class GUI():
                     else:
                         pass
                         # TODO: playlist has already been provided, check that
-                self._player.play(song_list)
+                self._player.play(songs=song_list)
                 
             except Exception:
                 config.logger.exception('Exception while playing music') 
-                messagebox.showerror('File not found', 'Player could not play the file. Please check logging.')
+                messagebox.showerror('Player error', 'Player could not play the file. Please check logging.')
             else:
                 self._show_details()
                 self._paused = FALSE
@@ -638,6 +634,7 @@ class GUI():
             Event called when the playlist is finished. 
             It will call more favorite songs to play.
         '''
+        print('Iḿ being callledeeeeeeeeeeeeeeeeeeeeeeee')
         if self._favs_score:
             self._execute_thread(self._search_favs_thread, self._play_music)
             
@@ -672,7 +669,10 @@ class GUI():
                                      values=(song.file_name, song.title, song.band, song.album.title, song.total_length)) 
         # add song to playlist dictionary, the index is the index in the playlist 
         self._playlist[pl_index] = song
-        self._player.append_to_playlist([song])
+        try:
+            self._player.add_to_playlist(songs=song)
+        except:
+            config.logger.exception(f'Could not add song with title {song.title}')
         
     def _add_to_album_list(self, album_dict):
         band_index = 1 
@@ -715,7 +715,9 @@ class GUI():
         '''
             Starts the player time details thread 
         '''
-        self._details_thread.start()
+        if self._stop_details_thread:
+            self._stop_details_thread = False
+            self._details_thread.start()
 
     def _start_count(self):
         '''
@@ -730,10 +732,10 @@ class GUI():
     @staticmethod
     def _treeview_sort_column(treeview, col, reverse):
         '''
-        Function to sort the columns of a treeview when headings are clicked.
-        @param: treeview, the treeview to sort
-        @param: col, the column to sort
-        @param: reverse, parameter to specify if it has to be sorted in reverse.        
+            Function to sort the columns of a treeview when headings are clicked.
+            @param: treeview, the treeview to sort
+            @param: col, the column to sort
+            @param: reverse, parameter to specify if it has to be sorted in reverse.        
         '''
         l = [(treeview.set(k, col), k) for k in treeview.get_children('')]
         l.sort(reverse=reverse)

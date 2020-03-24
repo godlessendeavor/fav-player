@@ -21,6 +21,33 @@ def check_media(func):
                 return func(self, *args, **kwargs)
     return inner
 
+def check_song_list(func):
+    '''
+        Decorator to check if "songs" argument complies with the following:
+        - it is either a list
+        - or a song, in this case it will convert it into a list
+        It does not check if its value is None
+    '''
+    
+    def inner(self, *args, **kwargs):
+        if 'songs' not in kwargs:
+            config.logger.error(f'Wrongly used function {func}')
+            raise Exception
+        else:
+            song_list = kwargs['songs'] 
+            if song_list:     
+                if isinstance(song_list, Song):
+                    kwargs['songs'] = [song_list]
+                elif isinstance(song_list, list):
+                    if len(song_list) < 1:
+                        config.logger.error(f'Song list should at least have one item.')
+                        raise Exception
+                else:
+                    config.logger.error(f'Wrong type passed to player {type(song_list)}.')
+                    raise Exception
+        return func(self, *args, **kwargs)
+    return inner
+
 
 
 class MyMediaPlayer(object):
@@ -78,22 +105,14 @@ class MyMediaPlayer(object):
         config.logging.debug(f'Event from VLC player: {event}')
         if self._song_started_func:
             self._song_started_func()
-            
-    def play(self, song_list = None):  
+     
+    @check_song_list       
+    def play(self, *, songs):  
         '''
             Plays the given song list (a list of Song objects).
         '''  
-        if not self._song_list and not song_list:
-            config.logger.error(f'A playlist needs to be provided before playing.')
-            return
-        if song_list:
-            if not isinstance(song_list, list):
-                config.logger.error(f'Wrong type passed to play {type(song_list)}.')
-                return   
-            if len(song_list) < 1:
-                config.logger.error(f'Not enough items to play.')
-                return          
-            self._song_list = song_list
+        if songs:
+            self._song_list.extend(songs)
         
         # stop any current play
         self.stop()    
@@ -101,14 +120,21 @@ class MyMediaPlayer(object):
         # start playing the first song
         self._play_next()
         
-    def append_to_playlist(self, song_list):
+    @check_song_list
+    def add_to_playlist(self, *, songs):
         '''
-            Appends a list to the existing playlist
+            Appends a song or a list of songs to the existing playlist.
         '''
-        if not isinstance(song_list, list):
-            config.logger.error(f'Wrong type passed to play {type(song_list)}')
-            return   
-        self._song_list.extend(song_list)
+        if songs:
+            self._song_list.extend(songs)
+    
+    @check_song_list   
+    def delete_from_playlist(self, *, songs):
+        '''
+            Deletes a song or a list of songs from the existing playlist.
+        '''
+        # TODO: remove from the list. Check the id of the song to identify it
+         
         
     def _play_next(self): 
         '''
