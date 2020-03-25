@@ -112,7 +112,7 @@ class GUI():
         vscrollbar = Scrollbar(self._top_left_frame, orient="vertical")
         hscrollbar = Scrollbar(self._top_left_frame, orient="horizontal")
         
-        self._playlistbox = ttk.Treeview(self._top_left_frame, yscrollcommand=vscrollbar.set, xscrollcommand=hscrollbar.set)  
+        self._playlistbox = ttk.Treeview(self._top_left_frame, yscrollcommand=vscrollbar.set, xscrollcommand=hscrollbar.set, height=20)  
         self._playlistbox["columns"] = ('FileName', 'Title', 'Band', 'Album', 'Length')
         self._playlistbox.heading("FileName", text="File Name",anchor=W)
         self._playlistbox.heading("Title", text="Title",anchor=W)
@@ -211,7 +211,7 @@ class GUI():
         self._albums_window.get_themes()                 # Returns a list of all themes that can be set
         self._albums_window.set_theme("radiance")        # Sets an available theme
         self._albums_window.title("Album Search")
-        self._albums_window.geometry("1400x600")         # TODO: geometry set but size of treeview doesn't change. What to do?
+        self._albums_window.geometry("1400x600")         
                   
         self._album_statusbar = ttk.Label(self._albums_window, text="Album library", relief=SUNKEN, anchor=W, font='Times 12')
         self._album_statusbar.pack(side=BOTTOM, fill=X)
@@ -237,7 +237,7 @@ class GUI():
         #ALBUM LIST        
         vscrollbar = Scrollbar(self._left_album_frame, orient="vertical")
         
-        self._album_listbox = ttk.Treeview(self._left_album_frame, yscrollcommand=vscrollbar.set)  
+        self._album_listbox = ttk.Treeview(self._left_album_frame, yscrollcommand=vscrollbar.set, height=20)  
         self._album_listbox["columns"] = ('Band', 'Title', 'Style', 'Year', 'Location', 'Type', 'Score', 'InBackup')
         self._album_listbox.heading("Band", text="Band",anchor=W)
         self._album_listbox.heading("Title", text="Title",anchor=W)
@@ -447,7 +447,7 @@ class GUI():
         '''
         self.statusbar['text'] = 'Getting favorite songs'
         try:
-            quantity = 10
+            quantity = 20
             songs = AlbumManager.get_favorites(quantity, self._favs_score)
             for song in songs:
                 self._add_song_to_playlist(song) 
@@ -665,11 +665,10 @@ class GUI():
         '''
             Adds song to GUI playlist and to the player.
         '''
-        pl_index = self._playlistbox.insert("", index=0, text="Band Name", 
+        pl_index = self._playlistbox.insert("", 'end', text="Band Name", 
                                      values=(song.file_name, song.title, song.band, song.album.title, song.total_length)) 
         # add song to playlist dictionary, the index is the index in the playlist 
         self._playlist[pl_index] = song
-        print(f'inserting song {song.title} on playlist')
         try:
             self._player.add_to_playlist(songs=song)
         except:
