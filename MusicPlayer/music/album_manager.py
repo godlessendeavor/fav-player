@@ -32,18 +32,18 @@ class AlbumManager:
         '''
             Function that returns a nested dictionary with all files in the Music folder
         '''
-        #initialize dictionary to store the directory tree
+        # initialize dictionary to store the directory tree
         dir_tree = {}
         rootdir = cls._collection_root.rstrip(os.sep) #remove leading whitespaces        
         config.logger.debug(f'Getting music directory tree from {rootdir}')
-        #recipe for getting the directory tree
+        # recipe for getting the directory tree
         start = rootdir.rfind(os.sep) + 1 #get the index for the name of the folder 
         for path, dirs, files in os.walk(rootdir):
             folders = path[start:].split(os.sep)
             subdir = dict.fromkeys(files)
             parent = reduce(dict.get, folders[:-1], dir_tree)  #call dict.get on every element of the folders list
             parent[folders[-1]] = subdir
-        #get the first value of the dictionary, we're not interested in the root name
+        # get the first value of the dictionary, we're not interested in the root name
         try:
             key, val = next(iter(dir_tree.items()))
         except Exception as ex:
@@ -57,17 +57,17 @@ class AlbumManager:
         Gets the albums collection from the configured Music Directory 
         and compares with the database collection.
         '''        
-        #First we get a directory tree with all the folders and files in the music directory tree
+        # First we get a directory tree with all the folders and files in the music directory tree
         dir_tree = cls._get_music_directory_tree()
-        #this will be our final directory tree
+        # this will be our final directory tree
         res_tree = {}
-        #let's check that the folders match our format Year - Title
+        # let's check that the folders match our format Year - Title
         for band, albums in list(dir_tree.items()):
             if albums:
                 for album in albums:
                     x = re.search("[0-9][ ]+-[ ]+.+", album)
                     if x:
-                        #replace the album key with the object from Album class and fill it
+                        # replace the album key with the object from Album class and fill it
                         album_obj = Album()
                         album_obj.band = band
                         band_key = band.casefold()
@@ -80,7 +80,7 @@ class AlbumManager:
                         res_tree[band_key][album] = album_obj
                     else:
                         config.logger.info('Album {album} of {band} is not following the format'.format(album=album, band=band))
-        #now let's check the database
+        # now let's check the database
         albums_list = cls._musicdb.api_albums_get_albums()
         if isinstance(albums_list, list):
             for db_album in albums_list:
@@ -117,7 +117,7 @@ class AlbumManager:
         :param score, the minimum score of the song 
         """
         fav_songs = []
-        #get a list from the database with the favorite songs
+        # get a list from the database with the favorite songs
         try:
             result = cls._musicdb.api_songs_get_songs(quantity = quantity, score = score)
         except Exception as ex:
@@ -125,23 +125,25 @@ class AlbumManager:
            raise(ex) 
         if result:            
             if isinstance(result.songs, list):
-                #get albums from collection to search for this song
+                # get albums from collection to search for this song
                 albums_dict = cls.get_albums_from_collection()
-                #for every song in the database result search the album info in the database
+                # for every song in the database result search the album info in the database
                 for db_song in result.songs:
                     try:
                         db_albums = cls._musicdb.api_albums_get_albums(album_id = db_song.disc_id)
                     except Exception as ex:
                         config.logger.exception(f'Could not get album with id {db_song.disc_id}')
                         continue
-                    #make sure it's only one
+                    # make sure it's only one
                     if isinstance(db_albums, list):
                         if len(db_albums) == 1:
                             db_album = db_albums[0]
-                            #if it's the same band then we continue, otherwise there might be a mistake
+                            # if it's the same band then we continue, otherwise there might be a mistake
                             if db_album.band.casefold() in albums_dict.keys():
                                 found_album = False
-                                #now check for all albums for this band in the collection to that one with same database id
+                                # now check for all albums for this band in the collection to that one with same database id
+                                # TODO: some of these casefolds makes the list show with the result of the casefold, 
+                                # show the band name instead of the key 
                                 for album_key, album in albums_dict[db_album.band.casefold()].items():
                                     if album.id == db_album.id:   
                                         found_album = True
@@ -188,7 +190,7 @@ class AlbumManager:
         disambiguation_keywords = style.lower().split() 
         filtered_bands = None
         number_of_bands = 0
-        #check how many bands are returned in the search 
+        # check how many bands are returned in the search 
         # check with the disambiguation contains at least some of the words in the style provided and filter to one band
         if "artist-list" in bands_list.keys():
             bands_with_same_name = [band_info for band_info in bands_list["artist-list"] if band_info["name"] == band_name]  
@@ -206,7 +208,7 @@ class AlbumManager:
             result = musicbrainzngs.get_artist_by_id(band_id,
                                                      includes=["release-groups"], 
                                                      release_type=["album", "ep"])
-            #let's filter out the compilations
+            # let's filter out the compilations
             release_list = filter(lambda item: (item["type"] != "Compilation"), result["artist"]["release-group-list"])
             album_year_list = []
             for release in release_list:

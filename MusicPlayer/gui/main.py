@@ -430,7 +430,7 @@ class GUI():
         '''               
         questionWindow = self.FavsScoreWindow(self._window_root)
         self._window_root.wait_window(questionWindow.top)
-        if questionWindow.score:
+        if hasattr(questionWindow, 'score'):
             try:
                 self._favs_score = float(questionWindow.score)
             except ValueError:
@@ -451,6 +451,7 @@ class GUI():
             songs = AlbumManager.get_favorites(quantity, self._favs_score)
             for song in songs:
                 self._add_song_to_playlist(song) 
+                #TODO revert the song in the playlistbox because itś shown on the opposite way
             self.statusbar['text'] = 'Favorite songs ready!'
         except ApiException:
             config.logger.exception("Exception when getting favorite songs from the server")
@@ -512,6 +513,7 @@ class GUI():
             for selected_song in selected_songs:      
                 self._playlistbox.delete(selected_song)
                 self._playlist.pop(selected_song)
+            self._player.delete_from_playlist(selected_songs)
             
     def _play_music(self, song_list = None):
         '''
@@ -634,7 +636,6 @@ class GUI():
             Event called when the playlist is finished. 
             It will call more favorite songs to play.
         '''
-        print('Iḿ being callledeeeeeeeeeeeeeeeeeeeeeeee')
         if self._favs_score:
             self._execute_thread(self._search_favs_thread, self._play_music)
             
@@ -664,11 +665,11 @@ class GUI():
         '''
             Adds song to GUI playlist and to the player.
         '''
-        index = 1         
-        pl_index = self._playlistbox.insert("", index, text="Band Name", 
+        pl_index = self._playlistbox.insert("", index=0, text="Band Name", 
                                      values=(song.file_name, song.title, song.band, song.album.title, song.total_length)) 
         # add song to playlist dictionary, the index is the index in the playlist 
         self._playlist[pl_index] = song
+        print(f'inserting song {song.title} on playlist')
         try:
             self._player.add_to_playlist(songs=song)
         except:
@@ -715,8 +716,7 @@ class GUI():
         '''
             Starts the player time details thread 
         '''
-        if self._stop_details_thread:
-            self._stop_details_thread = False
+        if not self._stop_details_thread:
             self._details_thread.start()
 
     def _start_count(self):

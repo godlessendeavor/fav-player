@@ -62,6 +62,7 @@ class MyMediaPlayer(object):
         self._song_finished_func      = None
         self._song_started_func       = None
         self._playlist_finished_func  = None
+        self._current_index = -1 
         
     def subscribe_song_finished(self, func, *args, **kwargs):
         '''
@@ -115,9 +116,8 @@ class MyMediaPlayer(object):
             self._song_list.extend(songs)
         
         # stop any current play
-        self.stop()    
-        self._current_index = -1             
-        # start playing the first song
+        self.stop()                        
+        # start playing the next song (self._current_index points to that)
         self._play_next()
         
     @check_song_list
@@ -133,6 +133,12 @@ class MyMediaPlayer(object):
         '''
             Deletes a song or a list of songs from the existing playlist.
         '''
+        for song in songs:
+            for song_player in self._song_list:
+                # TODO: implement a proper check (do not use ids because that's only for favorite songs)
+                if song == song_player:
+                    self._song_list.remove(song_player)
+                    break
         # TODO: remove from the list. Check the id of the song to identify it
          
         
@@ -149,9 +155,11 @@ class MyMediaPlayer(object):
             self._player.event_manager().event_attach(EventType.MediaPlayerPlaying, self._started_song_event) 
             self._player.audio_set_volume(self._volume) 
             self._player.play()
-        else:
+        elif len(self._song_list) == self._current_index:
             self._finished_playlist_event()
             config.logger.debug('Finished playing the list of songs')
+        else:
+            config.logger.error(f'Current playing index is {self._current_index} and the lengh of the list is {len(self._song_list)}')
             
      
     @check_media    
