@@ -650,13 +650,12 @@ class GUI():
             song.update_song_data_from_file(path_name)  
         except:
             config.logger.exception("Failed to add song to the playlist")
-        else:            
-            index = 1         
+        else:                 
             if album:
                 album_title = album.title
             else:
                 album_title = ""
-            pl_index = self._playlistbox.insert("", index, text="Band Name", 
+            pl_index = self._playlistbox.insert("", 'end', text="Band Name", 
                                      values=(file_name, song.title, song.band, album_title, song.total_length)) 
             # add song to playlist dictionary, the index is the index in the playlist 
             self._playlist[pl_index] = song
@@ -675,6 +674,9 @@ class GUI():
             config.logger.exception(f'Could not add song with title {song.title}')
         
     def _add_to_album_list(self, album_dict):
+        '''
+            Add input dict to album treeview
+        '''
         band_index = 1 
         for band, albums in sorted(album_dict.items()):
             # add tags for identifying which background color to apply

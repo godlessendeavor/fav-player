@@ -1,9 +1,0 @@
-apiVersion: v1
-data:
-  MUSICDB_CONFIG_FILE: /app_config/musicdb.conf
-kind: ConfigMap
-metadata:
-  creationTimestamp: null
-  labels:
-    io.musicdb.service: web-musicdb-env
-  name: web-musicdb-env
