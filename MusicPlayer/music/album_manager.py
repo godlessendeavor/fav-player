@@ -142,7 +142,6 @@ class AlbumManager:
                             if db_album.band.casefold() in albums_dict.keys():
                                 found_album = False
                                 # now check for all albums for this band in the collection to that one with same database id
-                                # TODO: some of these casefolds makes the list show with the result of the casefold, 
                                 # show the band name instead of the key 
                                 for album_key, album in albums_dict[db_album.band.casefold()].items():
                                     if album.id == db_album.id:   
