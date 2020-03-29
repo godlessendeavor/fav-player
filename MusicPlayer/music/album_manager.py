@@ -1,8 +1,8 @@
-'''
+"""
 Created on Dec 3, 2019
 
 @author: thrasher
-'''
+"""
 from functools import reduce, lru_cache
 import os
 import dateutil.parser as date_parser
@@ -22,6 +22,7 @@ songs_log_handler.setFormatter(config.LOGGING_FORMAT)
 album_logger = logging.getLogger(__name__)   
 songs_logger = logging.getLogger(__name__)
 
+
 class AlbumManager:
     _collection_root = config.MUSIC_PATH  
     _musicdb = config._musicdb_api
@@ -29,19 +30,19 @@ class AlbumManager:
     @classmethod  
     @lru_cache(maxsize=8)
     def _get_music_directory_tree(cls):
-        '''
+        """
             Function that returns a nested dictionary with all files in the Music folder
-        '''
+        """
         # initialize dictionary to store the directory tree
         dir_tree = {}
-        rootdir = cls._collection_root.rstrip(os.sep) #remove leading whitespaces        
+        rootdir = cls._collection_root.rstrip(os.sep) # remove leading whitespaces
         config.logger.debug(f'Getting music directory tree from {rootdir}')
         # recipe for getting the directory tree
-        start = rootdir.rfind(os.sep) + 1 #get the index for the name of the folder 
+        start = rootdir.rfind(os.sep) + 1 # get the index for the name of the folder
         for path, dirs, files in os.walk(rootdir):
             folders = path[start:].split(os.sep)
             subdir = dict.fromkeys(files)
-            parent = reduce(dict.get, folders[:-1], dir_tree)  #call dict.get on every element of the folders list
+            parent = reduce(dict.get, folders[:-1], dir_tree)  # call dict.get on every element of the folders list
             parent[folders[-1]] = subdir
         # get the first value of the dictionary, we're not interested in the root name
         try:
@@ -53,10 +54,10 @@ class AlbumManager:
     
     @classmethod  
     def get_albums_from_collection(cls):
-        '''
+        """
         Gets the albums collection from the configured Music Directory 
         and compares with the database collection.
-        '''        
+        """        
         # First we get a directory tree with all the folders and files in the music directory tree
         dir_tree = cls._get_music_directory_tree()
         # this will be our final directory tree
@@ -99,22 +100,21 @@ class AlbumManager:
     
     @classmethod
     def update_album(cls, album):
-        '''
+        """
             Function to update the albums. 
-        '''
+        """
         try:
             cls._musicdb.api_albums_update_album(album)
         except Exception as ex:
             config.logger.exception(f'Could not update album with title {album.title}') 
             raise(ex)
-            
     
     @classmethod
     def get_favorites(cls, quantity, score):
         """
-        Gets a list with random songs from the favorites list that complies with the required score.
-        :param quantity, the number of songs to return
-        :param score, the minimum score of the song 
+            Gets a list with random songs from the favorites list that complies with the required score.
+            :param quantity, the number of songs to return
+            :param score, the minimum score of the song
         """
         fav_songs = []
         # get a list from the database with the favorite songs
@@ -150,7 +150,7 @@ class AlbumManager:
                                         song = Song(db_song)    
                                         song.album = album     
                                         found_song = False             
-                                        #search for the song in the album path
+                                        # search for the song in the album path
                                         for folder, dirs, files in os.walk(album.path):
                                             for file_name in files:
                                                 #TODO: change the next check for a check against the file_name
@@ -164,8 +164,8 @@ class AlbumManager:
                                                     break
                                             if not found_song:
                                                 songs_logger.info(f'Song with title {song.title} from album title '
-                                                                 f'{song.album.title} and band {song.album.band} not found among the '
-                                                                 f'files of the corresponding album')
+                                                                  f'{song.album.title} and band {song.album.band}'
+                                                                  f' not found among the files of the corresponding album')
                                         break   
                                 if not found_album:
                                     songs_logger.info(f"Album with database id {db_album.id} could not be found in database for song {db_song.title}")       
@@ -179,12 +179,12 @@ class AlbumManager:
     
     @staticmethod
     def get_album_list_for_band(band_name: str, country: str, style: str):
-        '''
-        Gets the album list for the specified band name from the internet.
-        :param band_name the band name.
-        :param country the country of the band. Used for disambiguation.
-        :param style the style of the band. Used also for disambiguation.        
-        '''
+        """
+            Gets the album list for the specified band name from the internet.
+            :param band_name the band name.
+            :param country the country of the band. Used for disambiguation.
+            :param style the style of the band. Used also for disambiguation.
+        """
         musicbrainzngs.set_useragent("TODO: add name of app","1.0","TODO: add EMAIL from settings")
         bands_list = musicbrainzngs.search_artists(artist=band_name, type="group", country=country)
         disambiguation_keywords = style.lower().split() 

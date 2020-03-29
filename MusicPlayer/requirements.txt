@@ -1,5 +1,6 @@
-#ttkthemes
+ttkthemes
 musicbrainzngs
 mutagen
 mp3_tagger
 python-vlc
+musicdb-client
