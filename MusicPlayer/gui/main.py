@@ -147,10 +147,7 @@ class GUI():
                 Play item on double click.
             """
             row = self._playlistbox.identify_row(event.y)
-            if self._player.is_playing():
-                self._player.play_at(row)
-            else:
-                self._play_music([(self._playlist[str(row)])])
+            self._play_music([(self._playlist[str(row)])])
 
         # add popup to playlist treeview
         self._playlistbox.bind("<Button-3>", do_playlist_popup)
@@ -363,10 +360,10 @@ class GUI():
                                                                                     window=self._right_album_frame,
                                                                                     anchor=NW)
 
-    ################### TASKS EXECUTION ######################################################
-    ################### TASKS EXECUTION ######################################################
-    ################### TASKS EXECUTION ######################################################
-    ################### TASKS EXECUTION ######################################################
+    # ------------------ TASKS EXECUTION -----------------------------------------------------#
+    # ------------------ TASKS EXECUTION -----------------------------------------------------#
+    # ------------------ TASKS EXECUTION -----------------------------------------------------#
+    # ------------------ TASKS EXECUTION -----------------------------------------------------#
 
     def _execute_thread(self, target_thread, post_function=None, *args):
         """
@@ -394,10 +391,10 @@ class GUI():
             if post_function:
                 post_function(*args)
 
-    ################### MENU ACTIONS ######################################################
-    ################### MENU ACTIONS ######################################################
-    ################### MENU ACTIONS ######################################################
-    ################### MENU ACTIONS ######################################################
+    # ----------------- MENU ACTIONS ----------------------------------------------------#
+    # ----------------- MENU ACTIONS ----------------------------------------------------#
+    # ----------------- MENU ACTIONS ----------------------------------------------------#
+    # ----------------- MENU ACTIONS ----------------------------------------------------#
 
     def _browse_file(self):
         file_names = filedialog.askopenfilenames(parent=self._window_root, title="Choose files")
@@ -405,7 +402,7 @@ class GUI():
         for file_name in file_names:
             self._add_file_to_playlist(file_name, None)
 
-            ###################### GET FAVORITE SONGS ###########################
+    # ----------------------- GET FAVORITE SONGS ---------------------------------------------#
 
     class FavsScoreWindow(object):
         """
@@ -461,7 +458,7 @@ class GUI():
             messagebox.showerror("Error",
                                  "Some error while searching for favorites. Please check the connection to the server.")
 
-    ####################### GET THE ALBUM LIST ##################################
+    # --------------------------- GET THE ALBUM LIST ----------------------------------------------#
 
     def _show_album_list(self):
         """
@@ -484,9 +481,9 @@ class GUI():
         except:
             config.logger.exception("Exception when getting album collection")
 
-    ################### POP UP ACTIONS ######################################################
+    #--------------- POP UP ACTIONS -----------------------------------------------------------#
 
-    ############### MAIN PLAYER #############
+    #--------------- MAIN PLAYER ---------------#
 
     def _playlistbox_add_to_favorites(self):
         """
@@ -498,7 +495,7 @@ class GUI():
         except ApiException:
             messagebox.showerror("Error", "Error adding a new favorite song. Please check logging.")
 
-            ################### BUTTONS ACTIONS ######################################################
+    # ----------------------- BUTTONS ACTIONS -------------------------------------------#
 
     def _delete_song(self):
         """
@@ -581,7 +578,7 @@ class GUI():
             self._volume_scale.set(0)
             self._muted = TRUE
 
-    ####################### GUI EVENTS #################################
+    # ------------------------- GUI EVENTS ------------------------------------------#
 
     def _on_closing(self):
         """
@@ -599,21 +596,26 @@ class GUI():
            It will save the latest modified review if any.
         """
         if hasattr(self, '_selected_album') and self._selected_album:
-            review = self._review_text_box.get(1.0, END)
-            if self._selected_album_review_signature != get_signature(review):
-                config.logger.info(f"Review for album {self._selected_album.title} has changed. Updating the DB.")
-                self._selected_album.review = review
             try:
-                AlbumManager.update_album(self._selected_album)
+                review = self._review_text_box.get(1.0, END)
             except Exception as ex:
-                config.logger.exception('Could not save album review.')
+                config.logger.exception('Could not get text from review box on closing window. Maybe album window was already closed')
+            else:
+                if self._selected_album_review_signature != get_signature(review):
+                    config.logger.info(f"Review for album {self._selected_album.title} has changed. Updating the DB.")
+                    self._selected_album.review = review
+                try:
+                    AlbumManager.update_album(self._selected_album)
+                except Exception as ex:
+                    config.logger.exception('Could not save album review.')
         if hasattr(self, '_albums_window'):
             try:
                 self._albums_window.destroy()
-            except:
-                config.logger.exception('Could not close album window.')
+            except Exception:
+                # window might have already been destroyed
+                pass
 
-    ####################### PLAYER EVENTS #################################
+    # ------------------------ PLAYER EVENTS  -----------------------------------------#
 
     def _player_song_started_event(self):
         """
@@ -631,7 +633,7 @@ class GUI():
         if self._favs_score:
             self._execute_thread(self._search_favs_thread, self._play_music)
 
-    ######################### FUNCTION HELPERS #####################
+    # -------------------- FUNCTION HELPERS  ------------------------------------##
 
     def _add_file_to_playlist(self, path_name, album):
         file_name = basename(path_name)
@@ -668,17 +670,18 @@ class GUI():
 
     def _add_to_album_list(self, album_dict):
         """
-            Add input dict to album treeview
+            Add input dict to album tree view
         """
         band_index = 1
-        for band, albums in sorted(album_dict.items()):
+        for band_key, albums in sorted(album_dict.items()):
             # add tags for identifying which background color to apply
             if band_index % 2:
-                tags = ('oddrow',)
+                tags = ('odd_row',)
             else:
-                tags = ('evenrow',)
-            band_root = self._album_listbox.insert("", band_index, text=band,
-                                                   values=(band,
+                tags = ('even_row',)
+            band_name = next(iter(albums.values())).band
+            band_root = self._album_listbox.insert("", band_index, text=band_name,
+                                                   values=(band_name,
                                                            "",
                                                            "",
                                                            "",
@@ -691,7 +694,7 @@ class GUI():
             album_index = 1
             for album_key, album in albums.items():
                 # config.logger.debug(f"Adding album {album} to band {band}")                
-                album_id = self._album_listbox.insert(band_root, album_index,
+                album_id = self._album_listbox.insert(band_root, 'end',
                                                       values=("",
                                                               album.title,
                                                               album.style,
@@ -703,8 +706,8 @@ class GUI():
                 self._albums_list[album_id] = album
                 album_index += 1
         # apply background colors
-        self._album_listbox.tag_configure('oddrow', background='#D9FFDB')
-        self._album_listbox.tag_configure('evenrow', background='#FFE5CD')
+        self._album_listbox.tag_configure('odd_row', background='#D9FFDB')
+        self._album_listbox.tag_configure('even_row', background='#FFE5CD')
 
     def _show_details(self):
         """
