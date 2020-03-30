@@ -10,7 +10,6 @@ from tkinter import *
 from tkinter import filedialog
 from tkinter import ttk
 from ttkthemes import themed_tk as tk
-from PIL import ImageTk, Image as PILImage
 
 from musicdb_client.rest import ApiException
 
@@ -19,6 +18,7 @@ from music.song import Song
 from music.album import Album
 from music.album_manager import AlbumManager
 from music.media_player import MyMediaPlayer
+from music.cover_art_manager import  CoverArtManager, Dimensions
 
 
 def get_signature(contents):
@@ -36,6 +36,7 @@ class GUI():
         self._player.subscribe_playlist_finished(self._player_playlist_finished_event)
         self._paused = FALSE
         self._muted = FALSE
+        self._parallel_thread = None # the thread for executing parallel tasks alongside the GUI main loop
         self._playlist = {}  # dictionary containing the song objects of the playlist
         self._albums_list = {}  # dictionary containing the album objects for the album list
         self._albums_from_server = {}  # preliminary dictionary containing the data from the server, to be processed to _albums_list
@@ -329,21 +330,10 @@ class GUI():
                 # update selected album
                 self._selected_album = album
 
-                # TODO: load image asynchronously and perhaps move this to another module
-                # That module should look for a cover art from musicbrainz if not found here
-                file_names = [f for f in listdir(album.path) if isfile(join(album.path, f))]
-                image = None
-                for file_name in file_names:
-                    if "front" in file_name.casefold():
-                        image = join(album.path, file_name)
-                        break
-                if image:
-                    pil_image = PILImage.open(image)
-                    pil_image = pil_image.resize((250, 250), PILImage.ANTIALIAS)
-                    self._current_album_img = ImageTk.PhotoImage(pil_image, master=self._albums_window)
-                    self._album_workart_canvas.create_image(20, 20, anchor=NW, image=self._current_album_img)
-
-                    # album_list POUP
+                dim = Dimensions(250, 250)
+                # PhotoImage object must reside in memory
+                self._current_album_img = CoverArtManager.get_covert_art_for_album(album, self._albums_window, dim)
+                self._album_workart_canvas.create_image(20, 20, anchor=NW, image=self._current_album_img)
 
         self._album_list_popup = tkinter.Menu(self._albums_window, tearoff=0)
         self._album_list_popup.add_command(label="Play this item", command=do_album_list_play_album)
@@ -371,10 +361,15 @@ class GUI():
             It will start a new thread passed on target_thread and a progressbar to indicate progress
             Progress update is checked in _check_thread
         """
-        self._album_collection_thread = threading.Thread(target=target_thread)
-        self._album_collection_thread.daemon = True
+        if self._parallel_thread:
+            if self._parallel_thread.is_alive():
+                messagebox.showerror('Error', "Can't perform more than one task in parallel. Please wait until the current one finishes.")
+                return
+
+        self._parallel_thread = threading.Thread(target=target_thread)
+        self._parallel_thread.daemon = True
         self._progressbar.start()
-        self._album_collection_thread.start()
+        self._parallel_thread.start()
         self._window_root.after(100, self._check_thread, post_function, *args)
 
     def _check_thread(self, post_function, *args):
@@ -383,7 +378,7 @@ class GUI():
             Once the thread is finished it calls the post_function passed by argument with its arguments.
         """
         self._window_root.update()
-        if self._album_collection_thread.is_alive():
+        if self._parallel_thread.is_alive():
             self._window_root.after(100, self._check_thread, post_function, *args)
         else:
             self._progressbar.stop()
@@ -449,7 +444,6 @@ class GUI():
             songs = AlbumManager.get_favorites(quantity, self._favs_score)
             for song in songs:
                 self._add_song_to_playlist(song)
-                # TODO revert the song in the playlistbox because itś shown on the opposite way
             self.statusbar['text'] = 'Favorite songs ready!'
         except ApiException:
             config.logger.exception("Exception when getting favorite songs from the server")
@@ -525,8 +519,7 @@ class GUI():
                     if selected_songs_list:
                         song_list = [self._playlist[str(index_song)] for index_song in selected_songs_list]
                     else:
-                        pass
-                        # TODO: playlist has already been provided, check that
+                        pass # playlist has already been provided just play
                 self._player.play(songs=song_list)
 
             except Exception:
