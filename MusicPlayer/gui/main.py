@@ -43,7 +43,7 @@ class GUI():
         self._details_thread = threading.Thread(target=self._start_count)
         self._stop_details_thread = False
         # get the client to access the music_db server
-        self._musicdb = config._musicdb_api
+        self._musicdb = config.music_db_api
         # always initialize layout at the end because it contains the gui main loop
         self._init_main_window_layout()
 

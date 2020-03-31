@@ -14,18 +14,19 @@ from config import config
 import musicbrainzngs
 from builtins import staticmethod
 
-#set other logs config
-album_log_handler = logging.FileHandler(config.NON_COMPLIANT_ALBUMS_LOG)  
+# set other logs config
+album_log_handler = logging.FileHandler(config.NON_COMPLIANT_ALBUMS_LOG)
 songs_log_handler = logging.FileHandler(config.NON_COMPLIANT_SONGS_LOG)        
-album_log_handler.setFormatter(config.LOGGING_FORMAT)
-songs_log_handler.setFormatter(config.LOGGING_FORMAT)
-album_logger = logging.getLogger(__name__)   
-songs_logger = logging.getLogger(__name__)
-
+album_log_handler.setFormatter(logging.Formatter(config.LOGGING_FORMAT))
+songs_log_handler.setFormatter(logging.Formatter(config.LOGGING_FORMAT))
+album_logger = logging.getLogger('albums')
+songs_logger = logging.getLogger('songs')
+album_logger.addHandler(album_log_handler)
+songs_logger.addHandler(songs_log_handler)
 
 class AlbumManager:
     _collection_root = config.MUSIC_PATH  
-    _musicdb = config._musicdb_api
+    _music_db = config.music_db_api
     
     @classmethod  
     @lru_cache(maxsize=8)
@@ -35,11 +36,11 @@ class AlbumManager:
         """
         # initialize dictionary to store the directory tree
         dir_tree = {}
-        rootdir = cls._collection_root.rstrip(os.sep) # remove leading whitespaces
-        config.logger.debug(f'Getting music directory tree from {rootdir}')
+        root_dir = cls._collection_root.rstrip(os.sep) # remove leading whitespaces
+        config.logger.debug(f'Getting music directory tree from {root_dir}')
         # recipe for getting the directory tree
-        start = rootdir.rfind(os.sep) + 1 # get the index for the name of the folder
-        for path, dirs, files in os.walk(rootdir):
+        start = root_dir.rfind(os.sep) + 1 # get the index for the name of the folder
+        for path, dirs, files in os.walk(root_dir):
             folders = path[start:].split(os.sep)
             subdir = dict.fromkeys(files)
             parent = reduce(dict.get, folders[:-1], dir_tree)  # call dict.get on every element of the folders list
@@ -80,9 +81,9 @@ class AlbumManager:
                             res_tree[band_key] = {}
                         res_tree[band_key][album] = album_obj
                     else:
-                        config.logger.info('Album {album} of {band} is not following the format'.format(album=album, band=band))
+                        album_logger.warning('Album {album} of {band} is not following the format'.format(album=album, band=band))
         # now let's check the database
-        albums_list = cls._musicdb.api_albums_get_albums()
+        albums_list = cls._music_db.api_albums_get_albums()
         if isinstance(albums_list, list):
             for db_album in albums_list:
                 band_key = db_album.band.casefold()
@@ -104,7 +105,7 @@ class AlbumManager:
             Function to update the albums. 
         """
         try:
-            cls._musicdb.api_albums_update_album(album)
+            cls._music_db.api_albums_update_album(album)
         except Exception as ex:
             config.logger.exception(f'Could not update album with title {album.title}') 
             raise(ex)
@@ -119,7 +120,7 @@ class AlbumManager:
         fav_songs = []
         # get a list from the database with the favorite songs
         try:
-            result = cls._musicdb.api_songs_get_songs(quantity = quantity, score = score)
+            result = cls._music_db.api_songs_get_songs(quantity = quantity, score = score)
         except Exception as ex:
            config.logger.exception('Exception when getting favorite songs')
            raise(ex) 
@@ -130,7 +131,7 @@ class AlbumManager:
                 # for every song in the database result search the album info in the database
                 for db_song in result.songs:
                     try:
-                        db_albums = cls._musicdb.api_albums_get_albums(album_id = db_song.disc_id)
+                        db_albums = cls._music_db.api_albums_get_albums(album_id = db_song.disc_id)
                     except Exception as ex:
                         config.logger.exception(f'Could not get album with id {db_song.disc_id}')
                         continue
@@ -174,8 +175,7 @@ class AlbumManager:
                             config.logger.error(f'Found too many albums ({len(db_albums) }) with id {db_song.disc_i}')
         config.logger.debug(f"returning {fav_songs}")
         return fav_songs
-                    
-    
+
     @staticmethod
     def get_album_list_for_band(band_name: str, country: str, style: str):
         """

@@ -41,14 +41,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-#configure the musicdb client api
-_musicdb_config = musicdb_client.Configuration()
-_musicdb_config.host = MUSIC_DB_HOST
+# configure the musicdb client api
+_music_db_config = musicdb_client.Configuration()
+_music_db_config.host = MUSIC_DB_HOST
 if LOGGING_LEVEL == logging.DEBUG:
-    _musicdb_config.debug = True
-_musicdb_config.access_token = MUSIC_DB_TOKEN
-_musicdb_config.logger_file_handler = logger
+    _music_db_config.debug = True
+_music_db_config.access_token = MUSIC_DB_TOKEN
+_music_db_config.logger_file_handler = logger
 
-_musicdb_api = musicdb_client.PublicApi(musicdb_client.ApiClient(_musicdb_config))
+music_db_api = musicdb_client.PublicApi(musicdb_client.ApiClient(_music_db_config))
                                         
                                         
