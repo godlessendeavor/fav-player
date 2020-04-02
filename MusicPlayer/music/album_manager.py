@@ -73,14 +73,16 @@ class AlbumManager:
                         album_obj = Album()
                         album_obj.band = band
                         band_key = band.casefold()
-                        album_split = album.split('-',2)
+                        # split to max one '-'
+                        album_split = album.split('-', 1)
                         album_obj.year = album_split[0].strip()
                         album_obj.title = album_split[1].strip()
                         album_obj.path = os.path.join(cls._collection_root,band,album)
                         if band_key not in res_tree:
                             res_tree[band_key] = {}
                         res_tree[band_key][album] = album_obj
-                    else:
+                    # TODO: add a configurable list of exceptions, for now we hardcode 'Misc' as exception
+                    elif album != 'Misc':
                         album_logger.warning('Album {album} of {band} is not following the format'.format(album=album, band=band))
         # now let's check the database
         albums_list = cls._music_db.api_albums_get_albums()
@@ -88,15 +90,23 @@ class AlbumManager:
             for db_album in albums_list:
                 band_key = db_album.band.casefold()
                 if band_key in res_tree:
+                    # TODO: looping too many times on this tree, make something a bit more clever
                     for key, album_obj in res_tree[band_key].items():
+                        if band_key == "egoist":
+                            print("Comparing "+ album_obj.title.casefold() + " with "+db_album.title.casefold())
                         if album_obj.title.casefold() == db_album.title.casefold():
                             album_obj.merge(db_album)
-                            album_obj.in_db = True   
+                            album_obj.in_db = True
+                            if band_key == "egoist":
+                                print(f'Going out on {album_obj.title.casefold()}')
                             break
-                    if not album_obj.in_db:
-                        album_logger.warning(f'Album {album_obj.title} of band {album_obj.band} not found in database')
                 else:
-                    album_logger.warning(f'Band {db_album.band} not found in collection')                     
+                    album_logger.warning(f'Band {db_album.band} not found in collection')
+        # logging all missing albums from the database
+        for band_key, album_dict in res_tree.items():
+            for album in album_dict.values():
+                if not album.in_db:
+                    album_logger.warning(f'Album {album.title} of band {album.band} not found in database')
         return res_tree
     
     @classmethod

@@ -241,7 +241,7 @@ class GUI():
         vscrollbar = Scrollbar(self._left_album_frame, orient="vertical")
 
         self._album_listbox = ttk.Treeview(self._left_album_frame, yscrollcommand=vscrollbar.set, height=20)
-        self._album_listbox["columns"] = ('Band', 'Title', 'Style', 'Year', 'Location', 'Type', 'Score', 'InBackup')
+        self._album_listbox["columns"] = ('Band', 'Title', 'Style', 'Year', 'Location', 'Type', 'Score', 'InDB')
         self._album_listbox.heading("Band", text="Band", anchor=W)
         self._album_listbox.heading("Title", text="Title", anchor=W)
         self._album_listbox.heading("Style", text="Style", anchor=W)
@@ -249,7 +249,7 @@ class GUI():
         self._album_listbox.heading("Location", text="Location", anchor=W)
         self._album_listbox.heading("Type", text="Type", anchor=W)
         self._album_listbox.heading("Score", text="Score", anchor=W)
-        self._album_listbox.heading("InBackup", text="In Backup", anchor=W)
+        self._album_listbox.heading("InDB", text="In DB", anchor=W)
         self._album_listbox["show"] = "headings"  # This will remove the first column from the viewer
         # (first column of this widget is the identifier of the row)
         # add functionality for sorting
@@ -264,7 +264,7 @@ class GUI():
         self._album_listbox.column("Location", minwidth=0, width=120)
         self._album_listbox.column("Type", minwidth=0, width=120)
         self._album_listbox.column("Score", minwidth=0, width=40)
-        self._album_listbox.column("InBackup", minwidth=0, width=20)
+        self._album_listbox.column("InDB", minwidth=0, width=20)
 
         vscrollbar.config(command=self._album_listbox.yview)
         vscrollbar.pack(side=RIGHT, fill=Y, expand=True)
@@ -311,16 +311,18 @@ class GUI():
                 # if there was a previous album let's check if we have to update the review
                 if self._selected_album:
                     review = self._review_text_box.get(1.0, END)
-                    if self._selected_album_review_signature != get_signature(review):
-                        config.logger.info(
-                            f"Review for album {self._selected_album.title} has changed. Updating the DB.")
-                        self._selected_album.review = review
-                        try:
-                            # TODO: test the save the review also when the window is closed.
-                            AlbumManager.update_album(self._selected_album)
-                        except Exception as ex:
-                            config.logger.exception('Could not save album review.')
-                            messagebox.showerror('Error', message='Could not save album review. See log for errors.')
+                    # it there was a review selected before we check the signature
+                    if self._selected_album_review_signature:
+                        if self._selected_album_review_signature != get_signature(review):
+                            config.logger.info(
+                                f"Review for album {self._selected_album.title} has changed. Updating the DB.")
+                            self._selected_album.review = review
+                            try:
+                                # TODO: test the save the review also when the window is closed.
+                                AlbumManager.update_album(self._selected_album)
+                            except Exception as ex:
+                                config.logger.exception('Could not save album review.')
+                                messagebox.showerror('Error', message='Could not save album review. See log for errors.')
 
                 # set the review text
                 self._review_text_box.delete(1.0, END)
