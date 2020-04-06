@@ -88,7 +88,7 @@ class AlbumManager:
         albums_list = cls._music_db.api_albums_get_albums()
         if isinstance(albums_list, list):
             for db_album in albums_list:
-                band_key = db_album.band.casefold()
+                band_key = db_album.band.casefold().strip()
                 if band_key in res_tree:
                     # TODO: looping too many times on this tree, make something a bit more clever
                     for key, album_obj in res_tree[band_key].items():
@@ -128,57 +128,84 @@ class AlbumManager:
         try:
             result = cls._music_db.api_songs_get_songs(quantity = quantity, score = score)
         except Exception as ex:
-           config.logger.exception('Exception when getting favorite songs')
-           raise(ex) 
-        if result:            
-            if isinstance(result.songs, list):
-                # get albums from collection to search for this song
-                albums_dict = cls.get_albums_from_collection()
-                # for every song in the database result search the album info in the database
-                for db_song in result.songs:
-                    try:
-                        db_albums = cls._music_db.api_albums_get_albums(album_id = db_song.disc_id)
-                    except Exception as ex:
-                        config.logger.exception(f'Could not get album with id {db_song.disc_id}')
-                        continue
-                    # make sure it's only one
-                    if isinstance(db_albums, list):
-                        if len(db_albums) == 1:
-                            db_album = db_albums[0]
-                            # if it's the same band then we continue, otherwise there might be a mistake
-                            if db_album.band.casefold() in albums_dict.keys():
-                                found_album = False
-                                # now check for all albums for this band in the collection to that one with same database id
-                                # show the band name instead of the key 
-                                for album_key, album in albums_dict[db_album.band.casefold()].items():
-                                    if album.id == db_album.id:   
-                                        found_album = True
-                                        song = Song(db_song)    
-                                        song.album = album     
-                                        found_song = False             
-                                        # search for the song in the album path
-                                        for folder, dirs, files in os.walk(album.path):
-                                            for file_name in files:
-                                                #TODO: change the next check for a check against the file_name
-                                                #right now it's not stored in the database but it should
-                                                #if file == song.file_name:                                
-                                                if song.title in file_name and 'mp3' in file_name:
-                                                    found_song = True
-                                                    song.abs_path = os.path.join(folder, file_name)
-                                                    song.file_name = file_name
-                                                    fav_songs.append(song)
-                                                    break
-                                            if not found_song:
-                                                songs_logger.info(f'Song with title {song.title} from album title '
-                                                                  f'{song.album.title} and band {song.album.band}'
-                                                                  f' not found among the files of the corresponding album')
-                                        break   
-                                if not found_album:
-                                    songs_logger.info(f"Album with database id {db_album.id} could not be found in database for song {db_song.title}")       
-                            else:
-                                songs_logger.info(f"Band {db_album.band} not found in the list of bands")       
+            config.logger.exception('Exception when getting favorite songs')
+            raise(ex)
+        else:
+            return cls._get_songs_in_fs(result.songs)
+
+    @classmethod
+    def get_all_favorites(cls):
+        """
+            Gets all the favorite songs from the server.
+        """
+        fav_songs = []
+        # get a list from the database with the favorite songs
+        try:
+            result = cls._music_db.api_songs_get_all_songs()
+        except Exception as ex:
+            config.logger.exception('Exception when getting favorite songs')
+            raise (ex)
+        if result:
+            return cls._get_songs_in_fs(result.songs)
+
+    @classmethod
+    def _get_songs_in_fs(cls, song_list):
+        """
+            Returns the songs (of Song type) from the given list that exist on the File System.
+        """
+        fav_songs = []
+        if not isinstance(song_list, list):
+            config.logger.error(f'song_list is not of list type')
+        else:
+            # get albums from collection to search for this song list
+            albums_dict = cls.get_albums_from_collection()
+            # for every song in the database result search the album info in the database
+            for db_song in song_list:
+                try:
+                    # TODO: make an interface to get a list of albums for a given list of ids,
+                    #  call only once to the interface!
+                    db_albums = cls._music_db.api_albums_get_albums(album_id = db_song.disc_id)
+                except Exception as ex:
+                    config.logger.exception(f'Could not get album with id {db_song.disc_id}')
+                    continue
+                # make sure it's only one
+                if isinstance(db_albums, list):
+                    if len(db_albums) == 1:
+                        db_album = db_albums[0]
+                        # if it's the same band then we continue, otherwise there might be a mistake
+                        if db_album.band.casefold() in albums_dict.keys():
+                            found_album = False
+                            # now check for all albums for this band in the collection to that one with same database id
+                            # show the band name instead of the key
+                            for album_key, album in albums_dict[db_album.band.casefold()].items():
+                                if album.id == db_album.id:
+                                    found_album = True
+                                    song = Song(db_song)
+                                    song.album = album
+                                    found_song = False
+                                    # search for the song in the album path
+                                    for folder, dirs, files in os.walk(album.path):
+                                        for file_name in files:
+                                            #TODO: change the next check for a check against the file_name
+                                            #right now it's not stored in the database but it should
+                                            #if file == song.file_name:
+                                            if song.title in file_name and 'mp3' in file_name:
+                                                found_song = True
+                                                song.abs_path = os.path.join(folder, file_name)
+                                                song.file_name = file_name
+                                                fav_songs.append(song)
+                                                break
+                                        if not found_song:
+                                            songs_logger.info(f'Song with title {song.title} from album title '
+                                                              f'{song.album.title} and band {song.album.band}'
+                                                              f' not found among the files of the corresponding album')
+                                    break
+                            if not found_album:
+                                songs_logger.info(f"Album with database id {db_album.id} could not be found in database for song {db_song.title}")
                         else:
-                            config.logger.error(f'Found too many albums ({len(db_albums) }) with id {db_song.disc_i}')
+                            songs_logger.info(f"Band {db_album.band} not found in the list of bands")
+                    else:
+                        config.logger.error(f'Found too many albums ({len(db_albums) }) with id {db_song.disc_i}')
         config.logger.debug(f"returning {fav_songs}")
         return fav_songs
 
