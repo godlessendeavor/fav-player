@@ -2,7 +2,7 @@ from peewee import *
 from config import config
 import logging
 
-#set log configuration
+# set log configuration
 log_level = logging.getLevelName(config.LOGGING_LEVEL)
 
 logging.basicConfig(
@@ -11,21 +11,22 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-#set database configuration
-database = MySQLDatabase(config.DATABASE_NAME, 
-                         **{'charset': 'utf8', 
-                            'sql_mode': 'PIPES_AS_CONCAT', 
-                            'use_unicode': True, 
-                            'host': config.DATABASE_HOST, 
-                            'port': config.DATABASE_PORT, 
-                            'user': config.DATABASE_USER, 
+# set database configuration
+database = MySQLDatabase(config.DATABASE_NAME,
+                         **{'charset': 'utf8',
+                            'sql_mode': 'PIPES_AS_CONCAT',
+                            'use_unicode': True,
+                            'host': config.DATABASE_HOST,
+                            'port': config.DATABASE_PORT,
+                            'user': config.DATABASE_USER,
                             'password': config.DATABASE_PASSWORD})
 
 
 class BaseModel(Model):
     class Meta:
         database = database
-        
+
+
 class Album(BaseModel):
     id = AutoField(column_name='Id')
     copy = CharField(constraints=[SQL("DEFAULT ' '")])
@@ -40,6 +41,7 @@ class Album(BaseModel):
 
     class Meta:
         table_name = 'music'
+
 
 class Favorites(BaseModel):
     id = AutoField(column_name='Id')
@@ -58,8 +60,9 @@ def database_mgmt(func):
     '''
         Function decorator for opening/closing the database. Useful for each method that requires access to the database
     '''
+
     def wrapper_do_open_close(*args, **kwargs):
-        database.connect(reuse_if_open=True) 
+        database.connect(reuse_if_open=True)
         ex = None
         try:
             ret = func(*args, **kwargs)
@@ -67,34 +70,38 @@ def database_mgmt(func):
             logger.warning('Holding exception to close Database')
             if not database.is_closed():
                 database.close()
-            raise(ex)
+            raise (ex)
         if not database.is_closed():
-            database.close()           
+            database.close()
         return ret
+
     return wrapper_do_open_close
 
 
 class DatabaseProvider(object):
-    
-    @database_mgmt       
+
+    @database_mgmt
     def _search_song_by_title_and_album_id(self, song_title, album_id):
         result = Favorites.select().where((Favorites.disc_id == album_id) & (Favorites.track_title == song_title))
-        return [row for row  in result.dicts()]
-    
+        return [row for row in result.dicts()]
+
     @database_mgmt
     def get_songs(self, quantity, score):
-        #get result from database as Peewee model
-        result = Favorites.select().where(Favorites.score > score).order_by(fn.Rand()).limit(int(quantity))
-        #get results from the query and map the key names to the app_definition response object names
-        list_result = [row for row  in result.dicts()]
+        # get result from database as Peewee model
+        if quantity:
+            result = Favorites.select().where(Favorites.score > score).order_by(fn.Rand()).limit(int(quantity))
+        else:
+            result = Favorites.select()
+        # get results from the query and map the key names to the app_definition response object names
+        list_result = [row for row in result.dicts()]
         logger.debug('Getting result for get_songs: %s', list_result)
-        return {'songs' : list_result}
-    
+        return {'songs': list_result}
+
     @database_mgmt
-    def create_song(self, song) ->str:
+    def create_song(self, song) -> str:
         fav = Favorites()
-        #first copy compulsory fields and validate types
-        try:            
+        # first copy compulsory fields and validate types
+        try:
             fav.track_no = int(song['track_number'])
             fav.track_title = song['title']
             fav.score = float(song['score'])
@@ -106,68 +113,68 @@ class DatabaseProvider(object):
         except ValueError:
             logger.exception('Exception on value when creating favorite song')
             return song, 400
-        #now copy optional fields
+        # now copy optional fields
         try:
-            fav.type = song['type']            
+            fav.type = song['type']
         except KeyError:
-            logger.warning('Type of song was not provided for song: ', song)   
-        
+            logger.warning('Type of song was not provided for song: ', song)
+
         try:
             fav.type = song['_id']
         except KeyError:
-            #Id was not provided search song by title and disc_id, perhaps it already exists            
+            # Id was not provided search song by title and disc_id, perhaps it already exists
             result = self._search_song_by_title_and_album_id(fav.track_title, fav.disc_id)
             if result[0]:
                 try:
                     fav.id = result[0]['id']
                 except KeyError:
                     logger.exception('Exception on value when creating favorite song')
-        #save object in database
+        # save object in database
         fav.save()
-        return song,200
-    
+        return song, 200
+
     @database_mgmt
-    def update_song(self, song) ->str:
+    def update_song(self, song) -> str:
         return self.create_song(song)
-    
+
     @database_mgmt
-    def delete_song(self, song_id) ->str:
+    def delete_song(self, song_id) -> str:
         fav = Favorites.get(Favorites.id == song_id)
         try:
             fav.delete_instance()
         except Exception as ex:
-            logger.error('Exception when deleting favorite song: '+str(ex))
+            logger.error('Exception when deleting favorite song: ' + str(ex))
             return song_id, 400
         return song_id, 200
-    
+
     @database_mgmt
     def get_albums(self, quantity, album_id) -> str:
         if album_id:
-            result = Album.select().where(Album.id == album_id)          
+            result = Album.select().where(Album.id == album_id)
         elif quantity:
             result = Album.select().order_by(fn.Rand()).limit(int(quantity))
         else:
             result = Album.select()
-        if result:            
-            list_result = [row for row in result.dicts()] 
-            logger.debug('Getting result for get_album: %s', list_result) 
-            return list_result,200
+        if result:
+            list_result = [row for row in result.dicts()]
+            logger.debug('Getting result for get_album: %s', list_result)
+            return list_result, 200
         else:
             return album_id, 400
-    
+
     @database_mgmt
-    def create_album(self, album) ->str:
+    def create_album(self, album) -> str:
         # load the object and convert to album
-        #TODO: could we use the next line to convert to object with attributes from json dict?
-        #album_entry = json.loads(album, object_hook=lambda d: Namespace(**d))       
-        
+        # TODO: could we use the next line to convert to object with attributes from json dict?
+        # album_entry = json.loads(album, object_hook=lambda d: Namespace(**d))
+
         album_entry = Album()
         # first copy compulsory fields and validate types
-        try:      
-            album_entry.id    = album['id']             
-            album_entry.band  = album['band']
+        try:
+            album_entry.id = album['id']
+            album_entry.band = album['band']
             album_entry.title = album['title']
-            album_entry.year  = int(album['year'])
+            album_entry.year = int(album['year'])
         except KeyError:
             logger.exception('Exception on key when creating album.')
             return album, 400
@@ -176,27 +183,27 @@ class DatabaseProvider(object):
             return album, 400
         # now copy optional fields
         try:
-            album_entry.score    = float(album['score'])   
-            album_entry.review   = album['review']
-            album_entry.type     = album['type']
-            album_entry.country  = album['country']   
-            album_entry.copy     = album['copy']
-            album_entry.style    = album['style']  
+            album_entry.score = float(album['score'])
+            album_entry.review = album['review']
+            album_entry.type = album['type']
+            album_entry.country = album['country']
+            album_entry.copy = album['copy']
+            album_entry.style = album['style']
         except KeyError as ex:
-            logger.warning('Type was not provided for album: %s. %s', album, ex)  
+            logger.warning('Type was not provided for album: %s. %s', album, ex)
         except ValueError as ex:
-            logger.warning('Exception on value when creating album %s. %s', album, ex) 
-        # save object in database
+            logger.warning('Exception on value when creating album %s. %s', album, ex)
+            # save object in database
         logger.debug(f'Saving album {album_entry} in database')
         album_entry.save()
         return album, 200
-    
+
     @database_mgmt
-    def update_album(self, album) ->str:
+    def update_album(self, album) -> str:
         return self.create_album(album)
-    
+
     @database_mgmt
-    def delete_album(self, album_id) ->str:
+    def delete_album(self, album_id) -> str:
         album_entry = Album.get(Album.id == album_id)
         try:
             album_entry.delete_instance()
@@ -205,8 +212,6 @@ class DatabaseProvider(object):
             return album_id, 400
         return album_id, 200
 
-    #TODO: implement this in a different way or add behavior (like checking connection to database)
+    # TODO: implement this in a different way or add behavior (like checking connection to database)
     def get(self):
-        return "OK",200
-    
-    
+        return "OK", 200

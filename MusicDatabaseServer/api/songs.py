@@ -8,7 +8,7 @@ from providers.DatabaseProvider import DatabaseProvider
 
 
 @inject
-def get_songs(data_provider=DatabaseProvider, quantity = 1, score = 0.0) -> str:
+def get_songs(data_provider=DatabaseProvider, quantity = None, score = 0.0) -> str:
     return data_provider().get_songs(quantity, score)
 
 @inject

@@ -113,12 +113,12 @@ paths:
           name: quantity
           type: integer
           required: false
-          description: Number of favorite songs to get. If not indicated it will return 1 song (if there is at least one song matching the score criteria).
+          description: Number of favorite songs to get. If not indicated it will return all songs (if there is at least one song matching the score criteria).
         - in: query
           name: score
           type: number
           required: false
-          description: Minimum score of the favorite songs to get. If not indicated minimum is 0.
+          description: Minimum score of the favorite songs to get. If not indicated it will return all songs.
         tags:
         - public
         operationId: api.songs.get_songs
