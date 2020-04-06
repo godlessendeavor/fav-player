@@ -92,13 +92,9 @@ class AlbumManager:
                 if band_key in res_tree:
                     # TODO: looping too many times on this tree, make something a bit more clever
                     for key, album_obj in res_tree[band_key].items():
-                        if band_key == "egoist":
-                            print("Comparing "+ album_obj.title.casefold() + " with "+db_album.title.casefold())
                         if album_obj.title.casefold() == db_album.title.casefold():
                             album_obj.merge(db_album)
                             album_obj.in_db = True
-                            if band_key == "egoist":
-                                print(f'Going out on {album_obj.title.casefold()}')
                             break
                 else:
                     album_logger.warning(f'Band {db_album.band} not found in collection')

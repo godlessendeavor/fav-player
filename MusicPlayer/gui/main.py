@@ -18,7 +18,7 @@ from music.song import Song
 from music.album import Album
 from music.album_manager import AlbumManager
 from music.media_player import MyMediaPlayer
-from music.cover_art_manager import  CoverArtManager, Dimensions
+from music.cover_art_manager import CoverArtManager, Dimensions
 
 
 def get_signature(contents):
@@ -36,7 +36,7 @@ class GUI():
         self._player.subscribe_playlist_finished(self._player_playlist_finished_event)
         self._paused = FALSE
         self._muted = FALSE
-        self._parallel_thread = None # the thread for executing parallel tasks alongside the GUI main loop
+        self._parallel_thread = None  # the thread for executing parallel tasks alongside the GUI main loop
         self._playlist = {}  # dictionary containing the song objects of the playlist
         self._albums_list = {}  # dictionary containing the album objects for the album list
         self._albums_from_server = {}  # preliminary dictionary containing the data from the server, to be processed to _albums_list
@@ -322,7 +322,8 @@ class GUI():
                                 AlbumManager.update_album(self._selected_album)
                             except Exception as ex:
                                 config.logger.exception('Could not save album review.')
-                                messagebox.showerror('Error', message='Could not save album review. See log for errors.')
+                                messagebox.showerror('Error',
+                                                     message='Could not save album review. See log for errors.')
 
                 # set the review text
                 self._review_text_box.delete(1.0, END)
@@ -365,7 +366,8 @@ class GUI():
         """
         if self._parallel_thread:
             if self._parallel_thread.is_alive():
-                messagebox.showerror('Error', "Can't perform more than one task in parallel. Please wait until the current one finishes.")
+                messagebox.showerror('Error',
+                                     "Can't perform more than one task in parallel. Please wait until the current one finishes.")
                 return
 
         self._parallel_thread = threading.Thread(target=target_thread)
@@ -477,9 +479,9 @@ class GUI():
         except:
             config.logger.exception("Exception when getting album collection")
 
-    #--------------- POP UP ACTIONS -----------------------------------------------------------#
+    # --------------- POP UP ACTIONS -----------------------------------------------------------#
 
-    #--------------- MAIN PLAYER ---------------#
+    # --------------- MAIN PLAYER ---------------#
 
     def _playlistbox_add_to_favorites(self):
         """
@@ -521,7 +523,7 @@ class GUI():
                     if selected_songs_list:
                         song_list = [self._playlist[str(index_song)] for index_song in selected_songs_list]
                     else:
-                        pass # playlist has already been provided just play
+                        pass  # playlist has already been provided just play
                 self._player.play(songs=song_list)
 
             except Exception:
@@ -594,7 +596,8 @@ class GUI():
             try:
                 review = self._review_text_box.get(1.0, END)
             except Exception as ex:
-                config.logger.exception('Could not get text from review box on closing window. Maybe album window was already closed')
+                config.logger.exception(
+                    'Could not get text from review box on closing window. Maybe album window was already closed')
             else:
                 if self._selected_album_review_signature != get_signature(review):
                     config.logger.info(f"Review for album {self._selected_album.title} has changed. Updating the DB.")
@@ -645,7 +648,7 @@ class GUI():
                 album_title = ""
             pl_index = self._playlistbox.insert("", 'end', text="Band Name",
                                                 values=(
-                                                file_name, song.title, song.band, album_title, song.total_length))
+                                                    file_name, song.title, song.band, album_title, song.total_length))
             # add song to playlist dictionary, the index is the index in the playlist 
             self._playlist[pl_index] = song
 
@@ -655,7 +658,8 @@ class GUI():
         """
         pl_index = self._playlistbox.insert("", 'end', text="Band Name",
                                             values=(
-                                            song.file_name, song.title, song.band, song.album.title, song.total_length))
+                                                song.file_name, song.title, song.band, song.album.title,
+                                                song.total_length))
         # add song to playlist dictionary, the index is the index in the playlist 
         self._playlist[pl_index] = song
         try:
