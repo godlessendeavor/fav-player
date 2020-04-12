@@ -221,4 +221,4 @@ class MyMediaPlayer(object):
             config.logger.debug('Finished playing the list of songs')
         else:
             config.logger.error(
-                f'Current playing index is {self._current_index} and the lengh of the list is {len(self._song_list)}')
+                f'Current playing index is {self._current_index} and the length of the list is {len(self._song_list)}')

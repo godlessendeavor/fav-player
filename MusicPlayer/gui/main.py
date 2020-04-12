@@ -2,7 +2,7 @@ import threading
 import time
 import hashlib
 from os import listdir
-from os.path import basename, dirname, isfile, join
+from os.path import basename, dirname, isfile, join, relpath
 from functools import partial
 
 import tkinter.messagebox
@@ -28,7 +28,7 @@ def get_signature(contents):
     return hashlib.md5(str(contents).encode()).digest()
 
 
-class GUI():
+class GUI:
 
     def __init__(self):
         self._player = MyMediaPlayer()
@@ -45,6 +45,7 @@ class GUI():
         # get the client to access the music_db server
         self._musicdb = config.music_db_api
         # always initialize layout at the end because it contains the gui main loop
+        AlbumManager.set_file_func = self._add_path_to_fav_song
         self._init_main_window_layout()
 
     def _init_main_window_layout(self):
@@ -367,7 +368,8 @@ class GUI():
         if self._parallel_thread:
             if self._parallel_thread.is_alive():
                 messagebox.showerror('Error',
-                                     "Can't perform more than one task in parallel. Please wait until the current one finishes.")
+                                     "Can't perform more than one task in parallel. "
+                                     "Please wait until the current one finishes.")
                 return
 
         self._parallel_thread = threading.Thread(target=target_thread)
@@ -445,18 +447,36 @@ class GUI():
         self.statusbar['text'] = 'Getting favorite songs'
         try:
             quantity = 20
+            self._favs_score
             songs = AlbumManager.get_favorites(quantity, self._favs_score)
             for song in songs:
                 self._add_song_to_playlist(song)
             self.statusbar['text'] = 'Favorite songs ready!'
         except ApiException:
             config.logger.exception("Exception when getting favorite songs from the server")
-            messagebox.showerror("Error", "Some error while searching for favorites. Please see logging")
-        except Exception:
+            messagebox.showerror("Error", "Some error while searching for favorites. "
+                                          "Please check the connection to the server.")
+        except Exception as ex:
             messagebox.showerror("Error",
-                                 "Some error while searching for favorites. Please check the connection to the server.")
+                                 "Some error while searching for favorites. Please see logging.")
+            config.logger.exception("Exception when getting favorite songs from the server")
 
     # --------------------------- GET THE ALBUM LIST ----------------------------------------------#
+
+    #TODO: remove this function when issues with songs are fixed
+    def _add_path_to_fav_song(self, song):
+        file_name = None
+        file_name = filedialog.askopenfilenames(initialdir=config.MUSIC_PATH ,parent=self._window_root,
+                                                title=f"Choose file for song {song.title} "
+                                                    f"from album title {song.album.title} "
+                                                    f"and band {song.album.band}")
+        if file_name:
+            diff_path = relpath(file_name[0], song.album.path)
+            config.logger.info(f"Setting file name from {song.file_name} to {diff_path}")
+            song.file_name = diff_path
+            song.type = 'Strong'
+            config.music_db_api.api_songs_update_song(song)
+
 
     def _show_album_list(self):
         """
@@ -524,8 +544,10 @@ class GUI():
                         song_list = [self._playlist[str(index_song)] for index_song in selected_songs_list]
                     else:
                         pass  # playlist has already been provided just play
-                self._player.play(songs=song_list)
-
+                if len(self._playlist) != 0:
+                    self._player.play(songs=song_list)
+                else:
+                    config.logger.error("Playlist for music hasn't been provided")
             except Exception:
                 config.logger.exception('Exception while playing music')
                 messagebox.showerror('Player error', 'Player could not play the file. Please check logging.')
@@ -637,6 +659,7 @@ class GUI():
         file_name = basename(path_name)
         song = Song()
         song.album = album
+        song.file_name = file_name
         try:
             song.update_song_data_from_file(path_name)
         except:
@@ -656,16 +679,19 @@ class GUI():
         """
             Adds song to GUI playlist and to the player.
         """
-        pl_index = self._playlistbox.insert("", 'end', text="Band Name",
-                                            values=(
-                                                song.file_name, song.title, song.band, song.album.title,
-                                                song.total_length))
-        # add song to playlist dictionary, the index is the index in the playlist 
-        self._playlist[pl_index] = song
-        try:
-            self._player.add_to_playlist(songs=song)
-        except:
-            config.logger.exception(f'Could not add song with title {song.title}')
+        if song:
+            pl_index = self._playlistbox.insert("", 'end', text="Band Name",
+                                                values=(
+                                                    song.file_name, song.title, song.band, song.album.title,
+                                                    song.total_length))
+            # add song to playlist dictionary, the index is the index in the playlist
+            self._playlist[pl_index] = song
+            try:
+                self._player.add_to_playlist(songs=song)
+            except:
+                config.logger.exception(f'Could not add song with title {song.title}')
+        else:
+            config.logger.error(f'There was no song to add to playlist')
 
     def _add_to_album_list(self, album_dict):
         """
@@ -712,8 +738,9 @@ class GUI():
         """
             Starts the player time details thread 
         """
-        if not self._stop_details_thread:
+        if not self._stop_details_thread and not self._details_thread.is_alive():
             self._details_thread.start()
+
 
     def _start_count(self):
         """
