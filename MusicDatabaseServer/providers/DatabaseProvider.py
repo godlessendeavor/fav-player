@@ -57,9 +57,9 @@ class Favorites(BaseModel):
 
 
 def database_mgmt(func):
-    '''
+    """
         Function decorator for opening/closing the database. Useful for each method that requires access to the database
-    '''
+    """
 
     def wrapper_do_open_close(*args, **kwargs):
         database.connect(reuse_if_open=True)
@@ -82,28 +82,44 @@ class DatabaseProvider(object):
 
     @database_mgmt
     def _search_song_by_title_and_album_id(self, song_title, album_id):
-        result = Favorites.select().where((Favorites.disc_id == album_id) & (Favorites.track_title == song_title))
+        """
+            Gets a song from the favorites table by song title and album id.
+        """
+        result = Favorites.select().where((Favorites.disc_id == album_id) & (Favorites.title == song_title))
         return [row for row in result.dicts()]
 
     @database_mgmt
     def get_songs(self, quantity, score):
+        """
+            Get songs from the favorites table by quantity and score
+        """
         # get result from database as Peewee model
         if quantity:
-            result = Favorites.select().where(Favorites.score > score).order_by(fn.Rand()).limit(int(quantity))
+            result = Favorites.select(Favorites, Album) \
+                .join(Album, attr='album') \
+                .where(Favorites.score > score) \
+                .order_by(fn.Rand()).limit(int(quantity))
         else:
-            result = Favorites.select()
+            result = Favorites.select(Favorites, Album).join(Album, attr='album')
         # get results from the query and map the key names to the app_definition response object names
-        list_result = [row for row in result.dicts()]
+        # TODO: this is not efficient because the album key is being updated each time on the second loop
+        list_result = [dict(('album', {key: val for key, val in row.items() if hasattr(Album, key)})
+                            if hasattr(Album, key) else (key, val) for key, val in row.items())
+                       for row in result.dicts()]
+
         logger.debug('Getting result for get_songs: %s', list_result)
         return {'songs': list_result}
 
     @database_mgmt
     def create_song(self, song) -> str:
+        """
+            Creates a song on the favorites table.
+        """
         fav = Favorites()
         # first copy compulsory fields and validate types
         try:
             fav.track_no = int(song['track_number'])
-            fav.track_title = song['title']
+            fav.title = song['title']
             fav.score = float(song['score'])
             fav.disc_id = int(song['disc_id'])
             fav.file_name = song['file_name']
@@ -123,7 +139,7 @@ class DatabaseProvider(object):
             fav.type = song['_id']
         except KeyError:
             # Id was not provided search song by title and disc_id, perhaps it already exists
-            result = self._search_song_by_title_and_album_id(fav.track_title, fav.disc_id)
+            result = self._search_song_by_title_and_album_id(fav.title, fav.disc_id)
             if result[0]:
                 try:
                     fav.id = result[0]['id']
@@ -135,10 +151,16 @@ class DatabaseProvider(object):
 
     @database_mgmt
     def update_song(self, song) -> str:
+        """
+            Updates an existing song in the favorites table. Creates it if not existing.
+        """
         return self.create_song(song)
 
     @database_mgmt
     def delete_song(self, song_id) -> str:
+        """
+            Deletes a song from the favorites table.
+        """
         fav = Favorites.get(Favorites.id == song_id)
         try:
             fav.delete_instance()
