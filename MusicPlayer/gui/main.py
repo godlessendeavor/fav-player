@@ -2,7 +2,7 @@ import threading
 import time
 import hashlib
 from os import listdir
-from os.path import basename, dirname, isfile, join, relpath
+from os.path import basename, dirname, isfile, join
 from functools import partial
 
 import tkinter.messagebox
@@ -45,7 +45,6 @@ class GUI:
         # get the client to access the music_db server
         self._musicdb = config.music_db_api
         # always initialize layout at the end because it contains the gui main loop
-        AlbumManager.set_file_func = self._add_path_to_fav_song
         self._init_main_window_layout()
 
     def _init_main_window_layout(self):
@@ -446,9 +445,11 @@ class GUI:
         """
         self.statusbar['text'] = 'Getting favorite songs'
         try:
-            quantity = 20
+            #TODO uncomment this line and remove the none
+            quantity = 1
+            #quantity = None
             self._favs_score
-            songs = AlbumManager.get_favorites(quantity, self._favs_score)
+            songs = AlbumManager.get_favorites(quantity, self._favs_score, self._window_root)
             for song in songs:
                 self._add_song_to_playlist(song)
             self.statusbar['text'] = 'Favorite songs ready!'
@@ -462,21 +463,6 @@ class GUI:
             config.logger.exception("Exception when getting favorite songs from the server")
 
     # --------------------------- GET THE ALBUM LIST ----------------------------------------------#
-
-    #TODO: remove this function when issues with songs are fixed
-    def _add_path_to_fav_song(self, song):
-        file_name = None
-        file_name = filedialog.askopenfilenames(initialdir=config.MUSIC_PATH ,parent=self._window_root,
-                                                title=f"Choose file for song {song.title} "
-                                                    f"from album title {song.album.title} "
-                                                    f"and band {song.album.band}")
-        if file_name:
-            diff_path = relpath(file_name[0], song.album.path)
-            config.logger.info(f"Setting file name from {song.file_name} to {diff_path}")
-            song.file_name = diff_path
-            song.type = 'Strong'
-            config.music_db_api.api_songs_update_song(song)
-
 
     def _show_album_list(self):
         """

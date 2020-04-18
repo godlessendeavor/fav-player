@@ -70,42 +70,49 @@ class Song(DB_song):
             config.logger.exception(f'Could not set absolute path for song in {path}')
 
     def update_song_data_from_file(self, song_path):
-        self._abs_path = song_path
-        total_length = 0
-        # get attributes
-        file_data = os.path.splitext(song_path)
+        """
+            Updates the abs path of a song from a given path and it reads the MP3 data.
+            #TODO: support other types of audio
+        """
+        if os.path.isfile(song_path):
+            self._abs_path = song_path
+            total_length = 0
+            # get attributes
+            file_data = os.path.splitext(song_path)
 
-        if file_data[1] == '.mp3':
-            try:
-                audio = MP3(song_path)
-                total_length = audio.info.length
-            except MutagenError as ex:
-                config.logger.exception(f'Error when trying to get MP3 information for song in {song_path}')
-                raise ex
-            else:
-                # div - total_length/60, mod - total_length % 60
-                mins, secs = divmod(total_length, 60)
-                self._minutes = round(mins)
-                self._seconds = round(secs)
-
+            if file_data[1] == '.mp3':
                 try:
-                    # get tags
-                    mp3_file = MP3File(song_path)
-                    tags = mp3_file.get_tags()
-
-                    tagsv2 = tags['ID3TagV2']
-                except Exception:
-                    config.logger.exception("Some exception occurred while reading MP3 tags.")
+                    audio = MP3(song_path)
+                    total_length = audio.info.length
+                except MutagenError as ex:
+                    config.logger.exception(f'Error when trying to get MP3 information for song in {song_path}')
+                    raise ex
                 else:
-                    if not self._band and 'artist' in tagsv2:
-                        self._band = tagsv2['artist']
-                    if not self._album and 'album' in tagsv2:
-                        self._album = tagsv2['album']
-                    if not self._title and 'song' in tagsv2:
-                        self._title = tagsv2['song']
+                    # div - total_length/60, mod - total_length % 60
+                    mins, secs = divmod(total_length, 60)
+                    self._minutes = round(mins)
+                    self._seconds = round(secs)
 
+                    try:
+                        # get tags
+                        mp3_file = MP3File(song_path)
+                        tags = mp3_file.get_tags()
+
+                        tagsv2 = tags['ID3TagV2']
+                    except Exception:
+                        config.logger.exception("Some exception occurred while reading MP3 tags.")
+                    else:
+                        if not self._band and 'artist' in tagsv2:
+                            self._band = tagsv2['artist']
+                        if not self._album and 'album' in tagsv2:
+                            self._album = tagsv2['album']
+                        if not self._title and 'song' in tagsv2:
+                            self._title = tagsv2['song']
+
+            else:
+                raise Exception(f"File {song_path} is not MP3.")
         else:
-            raise Exception(f"File {song_path} is not MP3.")
+            raise Exception(f"File {song_path} does not exist. Could not set abs path for song.")
 
     def __str__(self):
         return str(self.__repr__())
