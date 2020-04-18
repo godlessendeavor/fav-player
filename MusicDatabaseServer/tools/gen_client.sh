@@ -1,6 +1,26 @@
-cd ~/workspace/tools/swagger-codegen/modules/swagger-codegen-cli/target/
-java -jar swagger-codegen-cli.jar generate -i http://0.0.0.0:2020/swagger.json -l python -o /tmp/python_api_client -c /home/thrasher/workspace/fav-player/MusicDatabaseServer/tools/swagger_client_gen_config.json 
+#/bin/bash
+while getopts ":ht" opt; do
+  case ${opt} in
+    h ) # process option h
+      echo "Use option u to upload the generated client to Pypi otherwise ti will install locally"
+      ;;
+    u ) # process option u
+      upload=True
+      ;;
+    \? ) echo "Usage: cmd [-h] [-t]"
+      ;;
+  esac
+done
+
+# generate the client
+#TODO: add version number as option?
+java -jar swagger-codegen-cli.jar generate -i ../open_api/app_definition.yaml -l python -o /tmp/python_api_client -c client_gen_config.json
 cd /tmp/python_api_client
-sudo python3 setup.py install
-python3 -m twine upload dist/*
+if [[ $upload == "True" ]]
+then
+  sudo python3 setup.py sdist # create distribution
+  python3 -m twine upload dist/*
+else
+  sudo python3 setup.py install --force # install and upgrade if existing
+fi
 

@@ -45,7 +45,7 @@ class Album(BaseModel):
 
 class Favorites(BaseModel):
     id = AutoField(column_name='Id')
-    disc_id = ForeignKeyField(Album, backref='favorites')
+    album_id = ForeignKeyField(Album, column_name='disc_id', backref='favorites')
     score = FloatField(constraints=[SQL("DEFAULT 0")])
     track_number = IntegerField(column_name='track_no', constraints=[SQL("DEFAULT 0")])
     title = CharField(column_name='track_title')
@@ -85,7 +85,7 @@ class DatabaseProvider(object):
         """
             Gets a song from the favorites table by song title and album id.
         """
-        result = Favorites.select().where((Favorites.disc_id == album_id) & (Favorites.title == song_title))
+        result = Favorites.select().where((Favorites.album_id == album_id) & (Favorites.title == song_title))
         return [row for row in result.dicts()]
 
     @database_mgmt
@@ -95,17 +95,20 @@ class DatabaseProvider(object):
         """
         # get result from database as Peewee model
         if quantity:
-            result = Favorites.select(Favorites, Album) \
-                .join(Album, attr='album') \
+            result = Favorites.select() \
                 .where(Favorites.score > score) \
                 .order_by(fn.Rand()).limit(int(quantity))
         else:
-            result = Favorites.select(Favorites, Album).join(Album, attr='album')
-        # get results from the query and map the key names to the app_definition response object names
-        # TODO: this is not efficient because the album key is being updated each time on the second loop
-        list_result = [dict(('album', {key: val for key, val in row.items() if hasattr(Album, key)})
-                            if hasattr(Album, key) else (key, val) for key, val in row.items())
-                       for row in result.dicts()]
+            result = Favorites.select(Favorites)
+        # No I will not do a JOIN. Some column names are the same in both tables (title for example)
+        # The simple Join query on Peewee will override those names
+        # That means that every column with shared name has to be given an alias and then map back to the
+        # corresponding model. A bit too much and Iḿ not worried about efficiency here
+        list_result = [row for row in result.dicts()]
+        for song in list_result:
+            result = Album.select() \
+                .where(Album.id == song['album_id'])
+            song['album'] = result.dicts()[0]
 
         logger.debug('Getting result for get_songs: %s', list_result)
         return {'songs': list_result}
@@ -121,7 +124,7 @@ class DatabaseProvider(object):
             fav.track_no = int(song['track_number'])
             fav.title = song['title']
             fav.score = float(song['score'])
-            fav.disc_id = int(song['disc_id'])
+            fav.album_id = int(song['album_id'])
             fav.file_name = song['file_name']
         except KeyError:
             logger.exception('Exception on key when creating favorite song')
@@ -136,10 +139,10 @@ class DatabaseProvider(object):
             logger.warning('Type of song was not provided for song: ', song)
 
         try:
-            fav.type = song['_id']
+            fav.id = song['id']
         except KeyError:
-            # Id was not provided search song by title and disc_id, perhaps it already exists
-            result = self._search_song_by_title_and_album_id(fav.title, fav.disc_id)
+            # Id was not provided search song by title and album_id, perhaps it already exists
+            result = self._search_song_by_title_and_album_id(fav.title, fav.album_id)
             if result[0]:
                 try:
                     fav.id = result[0]['id']
