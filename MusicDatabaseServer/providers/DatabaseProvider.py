@@ -88,6 +88,22 @@ class DatabaseProvider(object):
         result = Favorites.select().where((Favorites.album_id == album_id) & (Favorites.title == song_title))
         return [row for row in result.dicts()]
 
+    def _get_album_for_song(self, song):
+        """
+            Fills in the album info for a given song
+        """
+        if song and song['album_id']:
+            album_list, result = self.get_albums(None, song['album_id'])
+            if result == 200:
+                song['album'] = album_list[0]
+            else:
+                logger.error(f"Could not find album for song with album id {song['album_id']} and song id {song['id']}")
+                return None
+            return song
+        else:
+            logger.error(f"Could not get a song or album id for {song}")
+            return None
+
     @database_mgmt
     def get_songs(self, quantity, score):
         """
@@ -99,17 +115,12 @@ class DatabaseProvider(object):
                 .where(Favorites.score > score) \
                 .order_by(fn.Rand()).limit(int(quantity))
         else:
-            result = Favorites.select(Favorites)
-        # No I will not do a JOIN. Some column names are the same in both tables (title for example)
+            result = Favorites.select(Favorites).where(Favorites.file_name.is_null())
+        # No, I will not do a JOIN. Some column names are the same in both tables (title for example)
         # The simple Join query on Peewee will override those names
         # That means that every column with shared name has to be given an alias and then map back to the
-        # corresponding model. A bit too much and Iḿ not worried about efficiency here
-        list_result = [row for row in result.dicts()]
-        for song in list_result:
-            result = Album.select() \
-                .where(Album.id == song['album_id'])
-            song['album'] = result.dicts()[0]
-
+        # corresponding model. A bit too much and I'm not worried about efficiency here
+        list_result = [song for song in result.dicts() if self._get_album_for_song(song)]
         logger.debug('Getting result for get_songs: %s', list_result)
         return {'songs': list_result}
 
@@ -118,39 +129,42 @@ class DatabaseProvider(object):
         """
             Creates a song on the favorites table.
         """
-        fav = Favorites()
-        # first copy compulsory fields and validate types
-        try:
-            fav.track_no = int(song['track_number'])
-            fav.title = song['title']
-            fav.score = float(song['score'])
-            fav.album_id = int(song['album_id'])
-            fav.file_name = song['file_name']
-        except KeyError:
-            logger.exception('Exception on key when creating favorite song')
-            return song, 400
-        except ValueError:
-            logger.exception('Exception on value when creating favorite song')
-            return song, 400
-        # now copy optional fields
-        try:
-            fav.type = song['type']
-        except KeyError:
-            logger.warning('Type of song was not provided for song: ', song)
+        if song:
+            fav = Favorites()
+            # first copy compulsory fields and validate types
+            try:
+                fav.track_number = int(song['track_number'])
+                fav.title = song['title']
+                fav.score = float(song['score'])
+                fav.album_id = int(song['album']['id'])
+                fav.file_name = song['file_name']
+            except KeyError:
+                logger.exception('Exception on key when creating favorite song')
+                return song, 400
+            except ValueError:
+                logger.exception('Exception on value when creating favorite song')
+                return song, 400
+            # now copy optional fields
+            try:
+                fav.type = song['type']
+            except KeyError:
+                logger.warning('Type of song was not provided for song: ', song)
 
-        try:
-            fav.id = song['id']
-        except KeyError:
-            # Id was not provided search song by title and album_id, perhaps it already exists
-            result = self._search_song_by_title_and_album_id(fav.title, fav.album_id)
-            if result[0]:
-                try:
-                    fav.id = result[0]['id']
-                except KeyError:
-                    logger.exception('Exception on value when creating favorite song')
-        # save object in database
-        fav.save()
-        return song, 200
+            try:
+                fav.id = song['id']
+            except KeyError:
+                # Id was not provided search song by title and album_id, perhaps it already exists
+                result = self._search_song_by_title_and_album_id(fav.title, fav.album_id)
+                if result[0]:
+                    try:
+                        fav.id = result[0]['id']
+                    except KeyError:
+                        logger.exception('Exception on value when creating favorite song')
+            # save object in database
+            fav.save()
+            return song, 200
+        else:
+            return None, 400
 
     @database_mgmt
     def update_song(self, song) -> str:
@@ -174,6 +188,7 @@ class DatabaseProvider(object):
 
     @database_mgmt
     def get_albums(self, quantity, album_id) -> str:
+        # TODO: get album list if album_id is a list
         if album_id:
             result = Album.select().where(Album.id == album_id)
         elif quantity:
@@ -185,6 +200,7 @@ class DatabaseProvider(object):
             logger.debug('Getting result for get_album: %s', list_result)
             return list_result, 200
         else:
+            logger.error(f"Could not find album with id {album_id}")
             return album_id, 400
 
     @database_mgmt
