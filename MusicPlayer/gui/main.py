@@ -5,7 +5,7 @@ from os import listdir
 from os.path import basename, dirname, isfile, join
 from functools import partial
 
-import tkinter.messagebox
+import tkinter.messagebox as messagebox
 from tkinter import *
 from tkinter import filedialog
 from tkinter import ttk
@@ -16,7 +16,7 @@ from musicdb_client.rest import ApiException
 from config import config
 from music.song import Song
 from music.album import Album
-from music.album_manager import AlbumManager
+from music.music_manager import MusicManager
 from music.media_player import MyMediaPlayer
 from music.cover_art_manager import CoverArtManager, Dimensions
 
@@ -43,7 +43,8 @@ class GUI:
         self._details_thread = threading.Thread(target=self._start_count)
         self._stop_details_thread = False
         # get the client to access the music_db server
-        self._musicdb = config.music_db_api
+        self._music_db = config.music_db_api
+        MusicManager.set_file_name_function_cb(self.open_song_file_name)
         # always initialize layout at the end because it contains the gui main loop
         self._init_main_window_layout()
 
@@ -66,27 +67,27 @@ class GUI:
         #
         # Styles - normal, bold, roman, italic, underline, and overstrike.
 
-        self.statusbar = ttk.Label(self._window_root, text="Welcome to MusicPlayer", relief=SUNKEN, anchor=W,
-                                   font='Times 12')
-        self.statusbar.pack(side=BOTTOM, fill=X)
+        self.status_bar = ttk.Label(self._window_root, text="Welcome to MusicPlayer", relief=SUNKEN, anchor=W,
+                                    font='Times 12')
+        self.status_bar.pack(side=BOTTOM, fill=X)
 
         # Create the self._menubar
-        self._menubar = Menu(self._window_root)
-        self._window_root.config(menu=self._menubar)
+        self._menu_bar = Menu(self._window_root)
+        self._window_root.config(menu=self._menu_bar)
         # Create the File sub menu            
-        self._file_sub_menu = Menu(self._menubar, tearoff=0)
-        self._menubar.add_cascade(label="File", menu=self._file_sub_menu)
+        self._file_sub_menu = Menu(self._menu_bar, tearoff=0)
+        self._menu_bar.add_cascade(label="File", menu=self._file_sub_menu)
         self._file_sub_menu.add_command(label="Open", command=self._browse_file)
         self._file_sub_menu.add_command(label="Exit", command=self._window_root.destroy)
         # Create the Albums sub menu            
-        self._file_sub_menu = Menu(self._menubar, tearoff=0)
-        self._menubar.add_cascade(label="Albums", menu=self._file_sub_menu)
+        self._file_sub_menu = Menu(self._menu_bar, tearoff=0)
+        self._menu_bar.add_cascade(label="Albums", menu=self._file_sub_menu)
         album_list_func = partial(self._execute_thread, self._get_album_list_thread, self._show_album_list)
         self._file_sub_menu.add_command(label="Open List", command=album_list_func)
         # Create the Play sub menu            
-        self._play_sub_menu = Menu(self._menubar, tearoff=0)
-        self._menubar.add_cascade(label="Play", menu=self._play_sub_menu)
-        self._play_sub_menu.add_command(label="Favorites random", command=self._play_favs)
+        self._play_sub_menu = Menu(self._menu_bar, tearoff=0)
+        self._menu_bar.add_cascade(label="Play", menu=self._play_sub_menu)
+        self._play_sub_menu.add_command(label="Favorites random", command=self._play_favorites)
 
         # FRAMES STRUCTURE
         self._left_frame = Frame(self._window_root)
@@ -109,11 +110,11 @@ class GUI:
         self._bottom_right_frame.pack()
 
         # PLAYLIST
-        vscrollbar = Scrollbar(self._top_left_frame, orient="vertical")
-        hscrollbar = Scrollbar(self._top_left_frame, orient="horizontal")
+        v_scroll_bar = Scrollbar(self._top_left_frame, orient="vertical")
+        h_scroll_bar = Scrollbar(self._top_left_frame, orient="horizontal")
 
-        self._playlistbox = ttk.Treeview(self._top_left_frame, yscrollcommand=vscrollbar.set,
-                                         xscrollcommand=hscrollbar.set, height=20)
+        self._playlistbox = ttk.Treeview(self._top_left_frame, yscrollcommand=v_scroll_bar.set,
+                                         xscrollcommand=h_scroll_bar.set, height=20)
         self._playlistbox["columns"] = ('FileName', 'Title', 'Band', 'Album', 'Length')
         self._playlistbox.heading("FileName", text="File Name", anchor=W)
         self._playlistbox.heading("Title", text="Title", anchor=W)
@@ -124,15 +125,17 @@ class GUI:
         self._playlistbox[
             "show"] = "headings"  # This will remove the first column from the viewer (first column of this widget is the identifier of the row)
 
-        vscrollbar.config(command=self._playlistbox.yview)
-        vscrollbar.pack(side="right", fill="y")
+        v_scroll_bar.config(command=self._playlistbox.yview)
+        v_scroll_bar.pack(side="right", fill="y")
 
         self._playlistbox.pack(side="left", fill="y", expand=True)
 
         # PLAYLIST POUP
-        self._playlist_popup = tkinter.Menu(self._window_root, tearoff=0)
-        self._playlist_popup.add_command(label="Add song to favorites", command=self._playlistbox_add_to_favorites)
+        self._playlist_popup = Menu(self._window_root, tearoff=0)
+        self._playlist_popup.add_command(label="Add song to favorites", command=self._playlist_box_add_to_favorites)
         self._playlist_popup.add_separator()
+
+        self._playlist_popup.selection = None
 
         def do_playlist_popup(event):
             # display the _playlist_popup menu
@@ -150,7 +153,7 @@ class GUI:
             row = self._playlistbox.identify_row(event.y)
             self._play_music([(self._playlist[str(row)])])
 
-        # add popup to playlist treeview
+        # add popup to playlist tree view
         self._playlistbox.bind("<Button-3>", do_playlist_popup)
         self._playlistbox.bind('<Double-Button-1>', do_playlist_play_song)
 
@@ -215,9 +218,9 @@ class GUI:
         self._albums_window.title("Album Search")
         self._albums_window.geometry("1400x600")
 
-        self._album_statusbar = ttk.Label(self._albums_window, text="Album library", relief=SUNKEN, anchor=W,
-                                          font='Times 12')
-        self._album_statusbar.pack(side=BOTTOM, fill=X)
+        self._album_status_bar = ttk.Label(self._albums_window, text="Album library", relief=SUNKEN, anchor=W,
+                                           font='Times 12')
+        self._album_status_bar.pack(side=BOTTOM, fill=X)
 
         # variable that stores the selected album
         self._selected_album = None
@@ -238,9 +241,9 @@ class GUI:
         self._bottom_album_frame.pack(side=BOTTOM, expand=True)
 
         # ALBUM LIST
-        vscrollbar = Scrollbar(self._left_album_frame, orient="vertical")
+        v_scroll_bar = Scrollbar(self._left_album_frame, orient="vertical")
 
-        self._album_listbox = ttk.Treeview(self._left_album_frame, yscrollcommand=vscrollbar.set, height=20)
+        self._album_listbox = ttk.Treeview(self._left_album_frame, yscrollcommand=v_scroll_bar.set, height=20)
         self._album_listbox["columns"] = ('Band', 'Title', 'Style', 'Year', 'Location', 'Type', 'Score', 'InDB')
         self._album_listbox.heading("Band", text="Band", anchor=W)
         self._album_listbox.heading("Title", text="Title", anchor=W)
@@ -255,7 +258,7 @@ class GUI:
         # add functionality for sorting
         for col in self._album_listbox["columns"]:
             self._album_listbox.heading(col, text=col, command=lambda _col=col: \
-                GUI._treeview_sort_column(self._album_listbox, _col, False))
+                GUI._tree_view_sort_column(self._album_listbox, _col, False))
 
         self._album_listbox.column("Band", minwidth=0, width=220)
         self._album_listbox.column("Title", minwidth=0, width=280)
@@ -266,8 +269,8 @@ class GUI:
         self._album_listbox.column("Score", minwidth=0, width=40)
         self._album_listbox.column("InDB", minwidth=0, width=20)
 
-        vscrollbar.config(command=self._album_listbox.yview)
-        vscrollbar.pack(side=RIGHT, fill=Y, expand=True)
+        v_scroll_bar.config(command=self._album_listbox.yview)
+        v_scroll_bar.pack(side=RIGHT, fill=Y, expand=True)
 
         self._album_listbox.pack(side=LEFT, fill=BOTH, expand=True)
 
@@ -319,7 +322,7 @@ class GUI:
                             self._selected_album.review = review
                             try:
                                 # TODO: test the save the review also when the window is closed.
-                                AlbumManager.update_album(self._selected_album)
+                                MusicManager.update_album(self._selected_album)
                             except Exception as ex:
                                 config.logger.exception('Could not save album review.')
                                 messagebox.showerror('Error',
@@ -336,22 +339,24 @@ class GUI:
                 dim = Dimensions(250, 250)
                 # PhotoImage object must reside in memory
                 self._current_album_img = CoverArtManager.get_covert_art_for_album(album, self._albums_window, dim)
-                self._album_workart_canvas.create_image(20, 20, anchor=NW, image=self._current_album_img)
+                self._album_work_art_canvas.create_image(20, 20, anchor=NW, image=self._current_album_img)
 
-        self._album_list_popup = tkinter.Menu(self._albums_window, tearoff=0)
+        self._album_list_popup = Menu(self._albums_window, tearoff=0)
         self._album_list_popup.add_command(label="Play this item", command=do_album_list_play_album)
 
-        # add popup to album_list treeview
+        # add popup to album_list tree view
         self._album_listbox.bind("<Button-3>", do_album_list_popup)
-        # add Cover art change to treeview selection
+        # add Cover art change to tree view selection
         self._album_listbox.bind("<Button-1>", do_album_selection)
 
         # album image
-        self._album_workart_canvas = Canvas(self._top_album_frame, width=300, height=300)
-        self._album_workart_canvas.pack(expand=True)
-        self._album_workart_canvas_frame = self._album_workart_canvas.create_window((0, 0),
-                                                                                    window=self._right_album_frame,
-                                                                                    anchor=NW)
+        self._album_work_art_canvas = Canvas(self._top_album_frame, width=300, height=300)
+        self._album_work_art_canvas.pack(expand=True)
+        self._album_work_art_canvas_frame = self._album_work_art_canvas.create_window((0, 0),
+                                                                                      window=self._right_album_frame,
+                                                                                      anchor=NW)
+
+        self._album_list_popup.selection = None
 
     # ------------------ TASKS EXECUTION -----------------------------------------------------#
     # ------------------ TASKS EXECUTION -----------------------------------------------------#
@@ -404,7 +409,7 @@ class GUI:
 
     # ----------------------- GET FAVORITE SONGS ---------------------------------------------#
 
-    class FavsScoreWindow(object):
+    class FavoritesScoreWindow(object):
         """
             Window for asking the score for favorite songs
         """
@@ -422,11 +427,11 @@ class GUI:
             self.score = self.entry.get()
             self.top.destroy()
 
-    def _play_favs(self):
+    def _play_favorites(self):
         """
             Function to play the favorite songs
         """
-        question_window = self.FavsScoreWindow(self._window_root)
+        question_window = self.FavoritesScoreWindow(self._window_root)
         self._window_root.wait_window(question_window.top)
         if hasattr(question_window, 'score'):
             try:
@@ -437,22 +442,21 @@ class GUI:
                 if self._favs_score < 0.0 or self._favs_score > 10.0:
                     messagebox.showerror("Error", "Score must be between 0 and 10")
                 else:
-                    self._execute_thread(self._search_favs_thread, self._play_music)
+                    self._execute_thread(self._search_favorites_thread, self._play_music)
 
-    def _search_favs_thread(self):
+    def _search_favorites_thread(self):
         """
             Thread to search favorite songs and add to the playlist
         """
-        self.statusbar['text'] = 'Getting favorite songs'
+        self.status_bar['text'] = 'Getting favorite songs'
         try:
-            #TODO uncomment this line and remove the none
-            quantity = 1
-            #quantity = None
-            self._favs_score
-            songs = AlbumManager.get_favorites(quantity, self._favs_score, self._window_root)
+            # TODO uncomment this line and remove the none
+            # quantity = 10
+            quantity = None
+            songs = MusicManager.get_favorites(quantity, self._favs_score)
             for song in songs:
                 self._add_song_to_playlist(song)
-            self.statusbar['text'] = 'Favorite songs ready!'
+            self.status_bar['text'] = 'Favorite songs ready!'
         except ApiException:
             config.logger.exception("Exception when getting favorite songs from the server")
             messagebox.showerror("Error", "Some error while searching for favorites. "
@@ -471,7 +475,7 @@ class GUI:
         if self._albums_from_server:
             self._init_albums_window_layout()
             self._add_to_album_list(self._albums_from_server)
-            self.statusbar['text'] = 'Album list ready'
+            self.status_bar['text'] = 'Album list ready'
         else:
             messagebox.showerror("Error", "Error getting album collection. Please check logging.")
 
@@ -479,9 +483,9 @@ class GUI:
         """
             Function to be called as separate thread to get the album list.
         """
-        self.statusbar['text'] = 'Getting album list'
+        self.status_bar['text'] = 'Getting album list'
         try:
-            self._albums_from_server = AlbumManager.get_albums_from_collection()
+            self._albums_from_server = MusicManager.get_albums_from_collection()
         except:
             config.logger.exception("Exception when getting album collection")
 
@@ -489,14 +493,14 @@ class GUI:
 
     # --------------- MAIN PLAYER ---------------#
 
-    def _playlistbox_add_to_favorites(self):
+    def _playlist_box_add_to_favorites(self):
         """
             Adds the selected song from the playlist to the favorites in the server.
         """
         song = self._playlist[self._playlist_popup.selection]
         try:
-            self._musicdb.api_songs_update_song(song)
-        except ApiException:
+            MusicManager.add_song_to_favorites(song)
+        except Exception:
             messagebox.showerror("Error", "Error adding a new favorite song. Please check logging.")
 
     # ----------------------- BUTTONS ACTIONS -------------------------------------------#
@@ -520,7 +524,7 @@ class GUI:
         """
         if self._paused and not song_list:
             self._player.pause()
-            self.statusbar['text'] = "Music Resumed"
+            self.status_bar['text'] = "Music Resumed"
             self._paused = FALSE
         else:
             try:
@@ -540,7 +544,7 @@ class GUI:
             else:
                 self._show_details()
                 self._paused = FALSE
-                self.statusbar['text'] = "Music playing"
+                self.status_bar['text'] = "Music playing"
 
     def _stop_music(self):
         """
@@ -548,7 +552,7 @@ class GUI:
         """
         self._player.stop()
         self._stop_details_thread = True
-        self.statusbar['text'] = "Music stopped"
+        self.status_bar['text'] = "Music stopped"
 
     def _pause_music(self):
         """
@@ -557,10 +561,10 @@ class GUI:
         self._player.pause()
         if self._paused:
             self._paused = FALSE
-            self.statusbar['text'] = "Music Resumed"
+            self.status_bar['text'] = "Music Resumed"
         else:
             self._paused = TRUE
-            self.statusbar['text'] = "Music paused"
+            self.status_bar['text'] = "Music paused"
 
     def _set_volume(self, volume):
         """
@@ -611,7 +615,7 @@ class GUI:
                     config.logger.info(f"Review for album {self._selected_album.title} has changed. Updating the DB.")
                     self._selected_album.review = review
                 try:
-                    AlbumManager.update_album(self._selected_album)
+                    MusicManager.update_album(self._selected_album)
                 except Exception as ex:
                     config.logger.exception('Could not save album review.')
         if hasattr(self, '_albums_window'):
@@ -629,7 +633,7 @@ class GUI:
         """
         song = self._player.get_current_song()
         if song:
-            self.statusbar['text'] = f'Playing: {song.title}'
+            self.status_bar['text'] = f'Playing: {song.title}'
 
     def _player_playlist_finished_event(self):
         """
@@ -637,7 +641,7 @@ class GUI:
             It will call more favorite songs to play.
         """
         if self._favs_score:
-            self._execute_thread(self._search_favs_thread, self._play_music)
+            self._execute_thread(self._search_favorites_thread, self._play_music)
 
     # -------------------- FUNCTION HELPERS  ------------------------------------##
 
@@ -720,13 +724,25 @@ class GUI:
         self._album_listbox.tag_configure('odd_row', background='#D9FFDB')
         self._album_listbox.tag_configure('even_row', background='#FFE5CD')
 
+    def open_song_file_name(self, song):
+        """
+            Callback function to search interactively for a song file name.
+        """
+        file_name = filedialog.askopenfilenames(initialdir=config.MUSIC_PATH, parent=self._window_root,
+                                                title=f"Choose file for song {song.title} "
+                                                      f"from album title {song.album.title} "
+                                                      f"and band {song.album.band}")
+        if file_name:
+            return file_name[0]
+        else:
+            return None
+
     def _show_details(self):
         """
             Starts the player time details thread 
         """
         if not self._stop_details_thread and not self._details_thread.is_alive():
             self._details_thread.start()
-
 
     def _start_count(self):
         """
@@ -739,7 +755,7 @@ class GUI:
             time.sleep(1)
 
     @staticmethod
-    def _treeview_sort_column(treeview, col, reverse):
+    def _tree_view_sort_column(treeview, col, reverse):
         """
             Function to sort the columns of a treeview when headings are clicked.
             @param: treeview, the treeview to sort
@@ -755,7 +771,7 @@ class GUI:
 
         # reverse sort next time
         treeview.heading(col, command=lambda: \
-            GUI._treeview_sort_column(treeview, col, not reverse))
+            GUI._tree_view_sort_column(treeview, col, not reverse))
 
 
 if __name__ == '__main__':
