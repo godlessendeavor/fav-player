@@ -115,7 +115,7 @@ class DatabaseProvider(object):
                 .where(Favorites.score > score) \
                 .order_by(fn.Rand()).limit(int(quantity))
         else:
-            result = Favorites.select(Favorites).where(Favorites.file_name.is_null())
+            result = Favorites.select(Favorites).where()
         # No, I will not do a JOIN. Some column names are the same in both tables (title for example)
         # The simple Join query on Peewee will override those names
         # That means that every column with shared name has to be given an alias and then map back to the
@@ -212,7 +212,6 @@ class DatabaseProvider(object):
         album_entry = Album()
         # first copy compulsory fields and validate types
         try:
-            album_entry.id = album['id']
             album_entry.band = album['band']
             album_entry.title = album['title']
             album_entry.year = int(album['year'])

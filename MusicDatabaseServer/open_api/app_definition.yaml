@@ -59,6 +59,7 @@ paths:
         content:
           application/json:
             schema:
+              x-body-name: album
               $ref: '#/components/schemas/album'
         required: true
       responses:
@@ -76,6 +77,7 @@ paths:
         content:
           application/json:
             schema:
+              x-body-name: album
               $ref: '#/components/schemas/album'
         required: true
       responses:
