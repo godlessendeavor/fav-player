@@ -44,7 +44,8 @@ class GUI:
         self._stop_details_thread = False
         # get the client to access the music_db server
         self._music_db = config.music_db_api
-        MusicManager.set_file_name_function_cb(self.open_song_file_name)
+        MusicManager.set_update_song_data_cb(self.update_song_data)
+        MusicManager.set_update_album_data_cb(self.update_album_data)
         # always initialize layout at the end because it contains the gui main loop
         self._init_main_window_layout()
 
@@ -71,7 +72,7 @@ class GUI:
                                     font='Times 12')
         self.status_bar.pack(side=BOTTOM, fill=X)
 
-        # Create the self._menubar
+        # Create the main Menu bar
         self._menu_bar = Menu(self._window_root)
         self._window_root.config(menu=self._menu_bar)
         # Create the File sub menu            
@@ -84,6 +85,8 @@ class GUI:
         self._menu_bar.add_cascade(label="Albums", menu=self._file_sub_menu)
         album_list_func = partial(self._execute_thread, self._get_album_list_thread, self._show_album_list)
         self._file_sub_menu.add_command(label="Open List", command=album_list_func)
+        album_add_to_db_func = partial(self._execute_thread, self._add_albums_to_db_thread, self._show_album_list)
+        self._file_sub_menu.add_command(label="Add albums from filesystem to DB", command=album_add_to_db_func)
         # Create the Play sub menu            
         self._play_sub_menu = Menu(self._menu_bar, tearoff=0)
         self._menu_bar.add_cascade(label="Play", menu=self._play_sub_menu)
@@ -297,6 +300,7 @@ class GUI:
             file_names = [f for f in listdir(album.path) if isfile(join(album.path, f))]
             for file_name in file_names:
                 self._add_file_to_playlist(join(album.path, file_name), album)
+            self._play_music()
 
         def do_album_selection(event):
             """
@@ -414,35 +418,43 @@ class GUI:
             Window for asking the score for favorite songs
         """
 
-        def __init__(self, master):
+        def __init__(self, master, message):
             top = self.top = Toplevel(master)
-            self.label = Label(top, text="Please give the minimum score of songs to play")
+            self.label = Label(top, text=message)
             self.label.pack()
             self.entry = Entry(top)
             self.entry.pack()
             self.button = Button(top, text='Ok', command=self.cleanup)
             self.button.pack()
+            self.score = None
 
         def cleanup(self):
             self.score = self.entry.get()
             self.top.destroy()
 
+    def _get_score_input(self, message):
+        question_window = self.FavoritesScoreWindow(self._window_root, message)
+        self._window_root.wait_window(question_window.top)
+        score = None
+        try:
+            score = float(question_window.score)
+        except ValueError:
+            messagebox.showerror("Error", "Score must be a number between 0 and 10")
+        except Exception:
+            messagebox.showerror("Error", "Some error parsing the score value. Please check logging.")
+            config.logger.exception("Error parsing the score value")
+        else:
+            if score < 0.0 or score > 10.0:
+                messagebox.showerror("Error", "Score must be between 0 and 10")
+        return score
+
     def _play_favorites(self):
         """
             Function to play the favorite songs
         """
-        question_window = self.FavoritesScoreWindow(self._window_root)
-        self._window_root.wait_window(question_window.top)
-        if hasattr(question_window, 'score'):
-            try:
-                self._favs_score = float(question_window.score)
-            except ValueError:
-                messagebox.showerror("Error", "Score must be a number between 0 and 10")
-            else:
-                if self._favs_score < 0.0 or self._favs_score > 10.0:
-                    messagebox.showerror("Error", "Score must be between 0 and 10")
-                else:
-                    self._execute_thread(self._search_favorites_thread, self._play_music)
+        self._favorites_score = self._get_score_input("Please give the minimum score of songs to play")
+        if self._favorites_score:
+            self._execute_thread(self._search_favorites_thread, self._play_music)
 
     def _search_favorites_thread(self):
         """
@@ -450,10 +462,8 @@ class GUI:
         """
         self.status_bar['text'] = 'Getting favorite songs'
         try:
-            # TODO uncomment this line and remove the none
-            # quantity = 10
-            quantity = None
-            songs = MusicManager.get_favorites(quantity, self._favs_score)
+            quantity = 10
+            songs = MusicManager.get_favorites(quantity, self._favorites_score)
             for song in songs:
                 self._add_song_to_playlist(song)
             self.status_bar['text'] = 'Favorite songs ready!'
@@ -481,11 +491,21 @@ class GUI:
 
     def _get_album_list_thread(self):
         """
-            Function to be called as separate thread to get the album list.
+            Thread to get the album list.
         """
         self.status_bar['text'] = 'Getting album list'
         try:
             self._albums_from_server = MusicManager.get_albums_from_collection()
+        except:
+            config.logger.exception("Exception when getting album collection")
+
+    def _add_albums_to_db_thread(self):
+        """
+            Thread to add albums from the filesystem to the database.
+        """
+        self.status_bar['text'] = 'Adding albums to database'
+        try:
+            self._albums_from_server = MusicManager.add_new_albums_from_collection_to_db()
         except:
             config.logger.exception("Exception when getting album collection")
 
@@ -498,10 +518,14 @@ class GUI:
             Adds the selected song from the playlist to the favorites in the server.
         """
         song = self._playlist[self._playlist_popup.selection]
-        try:
-            MusicManager.add_song_to_favorites(song)
-        except Exception:
-            messagebox.showerror("Error", "Error adding a new favorite song. Please check logging.")
+        score = self._get_score_input(f"Give the score for the current song {song.title}"
+                                      f" with current score {song.score}")
+        if score:
+            song.score = score
+            try:
+                MusicManager.add_song_to_favorites(song)
+            except Exception:
+                messagebox.showerror("Error", "Error adding a new favorite song. Please check logging.")
 
     # ----------------------- BUTTONS ACTIONS -------------------------------------------#
 
@@ -640,7 +664,7 @@ class GUI:
             Event called when the playlist is finished. 
             It will call more favorite songs to play.
         """
-        if self._favs_score:
+        if self._favorites_score:
             self._execute_thread(self._search_favorites_thread, self._play_music)
 
     # -------------------- FUNCTION HELPERS  ------------------------------------##
@@ -651,19 +675,12 @@ class GUI:
         song.album = album
         song.file_name = file_name
         try:
-            song.update_song_data_from_file(path_name)
+            updated = song.update_song_data_from_file(path_name)
         except:
             config.logger.exception("Failed to add song to the playlist")
         else:
-            if album:
-                album_title = album.title
-            else:
-                album_title = ""
-            pl_index = self._playlistbox.insert("", 'end', text="Band Name",
-                                                values=(
-                                                    file_name, song.title, song.band, album_title, song.total_length))
-            # add song to playlist dictionary, the index is the index in the playlist 
-            self._playlist[pl_index] = song
+            if updated:
+                self._add_song_to_playlist(song)
 
     def _add_song_to_playlist(self, song):
         """
@@ -724,9 +741,10 @@ class GUI:
         self._album_listbox.tag_configure('odd_row', background='#D9FFDB')
         self._album_listbox.tag_configure('even_row', background='#FFE5CD')
 
-    def open_song_file_name(self, song):
+    def update_song_data(self, song):
         """
-            Callback function to search interactively for a song file name.
+            Callback function to update interactively song data.
+            We only ask for file name.
         """
         file_name = filedialog.askopenfilenames(initialdir=config.MUSIC_PATH, parent=self._window_root,
                                                 title=f"Choose file for song {song.title} "
@@ -736,6 +754,13 @@ class GUI:
             return file_name[0]
         else:
             return None
+
+    def update_album_data(self, song):
+        """
+            Callback function to update interactive.y album data.
+        """
+        # TODO
+        pass
 
     def _show_details(self):
         """

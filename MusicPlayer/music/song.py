@@ -74,6 +74,7 @@ class Song(DB_song):
             Updates the abs path of a song from a given path and it reads the MP3 data.
             #TODO: support other types of audio
         """
+        updated = False
         if os.path.isfile(song_path):
             self._abs_path = song_path
             total_length = 0
@@ -86,7 +87,6 @@ class Song(DB_song):
                     total_length = audio.info.length
                 except MutagenError as ex:
                     config.logger.exception(f'Error when trying to get MP3 information for song in {song_path}')
-                    raise ex
                 else:
                     # div - total_length/60, mod - total_length % 60
                     mins, secs = divmod(total_length, 60)
@@ -108,11 +108,13 @@ class Song(DB_song):
                             self._album = tagsv2['album']
                         if not self._title and 'song' in tagsv2:
                             self._title = tagsv2['song']
+                updated = True
 
             else:
-                raise Exception(f"File {song_path} is not MP3.")
+                config.logger.info(f"File {song_path} is not MP3.")
         else:
             raise Exception(f"File {song_path} does not exist. Could not set abs path for song.")
+        return updated
 
     def __str__(self):
         return str(self.__repr__())
