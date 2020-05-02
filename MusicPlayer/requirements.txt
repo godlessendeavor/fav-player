@@ -3,4 +3,4 @@ musicbrainzngs
 mutagen
 mp3_tagger
 python-vlc
-musicdb-client
+#musicdb-client

@@ -31,32 +31,9 @@ songs_logger.addHandler(songs_log_handler)
 class MusicManager:
     _collection_root = config.MUSIC_PATH
     _music_db = config.music_db_api
+    _set_album_data_cb = None
     _set_song_data_cb = None
-
-    @classmethod
-    @lru_cache(maxsize=8)
-    def _get_music_directory_tree(cls):
-        """
-            Function that returns a nested dictionary with all files in the Music folder
-        """
-        # initialize dictionary to store the directory tree
-        dir_tree = {}
-        root_dir = cls._collection_root.rstrip(os.sep)  # remove leading whitespaces
-        config.logger.debug(f'Getting music directory tree from {root_dir}')
-        # recipe for getting the directory tree
-        start = root_dir.rfind(os.sep) + 1  # get the index for the name of the folder
-        for path, dirs, files in os.walk(root_dir):
-            folders = path[start:].split(os.sep)
-            subdir = dict.fromkeys(files)
-            parent = reduce(dict.get, folders[:-1], dir_tree)  # call dict.get on every element of the folders list
-            parent[folders[-1]] = subdir
-        # get the first value of the dictionary, we're not interested in the root name
-        try:
-            key, val = next(iter(dir_tree.items()))
-        except Exception as ex:
-            config.logger.exception("Could not get Music directory tree")
-            raise ex
-        return val
+    _music_dir_tree = None
 
     @classmethod
     def set_update_song_data_cb(cls, cb):
@@ -71,6 +48,161 @@ class MusicManager:
             Sets a callback to set the album data from the GUI.
         """
         cls._set_album_data_cb = cb
+
+    @classmethod
+    def get_albums_from_collection(cls):
+        """
+            Gets the albums collection from the configured Music Directory
+            and compares with the database collection.
+        """
+        return cls._update_albums_from_collection()
+
+    @classmethod
+    def add_new_albums_from_collection_to_db(cls):
+        """
+            Adds all the albums from the collection that are not in the database yet.
+        """
+        return cls._update_albums_from_collection(True)
+
+    @classmethod
+    def update_album(cls, album):
+        """
+            Function to update an album in the server.
+        """
+        try:
+            album = cls._music_db.api_albums_update_album(album)
+        except Exception as ex:
+            config.logger.exception(f'Could not update album with title {album.title}')
+            raise ex
+        else:
+            return album
+
+    @classmethod
+    def get_favorites(cls, quantity, score):
+        """
+            Gets a list with random songs from the favorites list that complies with the required score.
+            :param quantity, the number of songs to return
+            :param score, the minimum score of the song
+        """
+        fav_songs = []
+        # get a list from the database with the favorite songs
+        try:
+            if quantity:
+                result = cls._music_db.api_songs_get_songs(quantity=quantity, score=score)
+            else:
+                result = cls._music_db.api_songs_get_songs()
+        except Exception as ex:
+            config.logger.exception('Exception when getting favorite songs')
+            raise ex
+        else:
+            return cls._get_songs_in_fs(result.songs)
+
+    @classmethod
+    def add_song_to_favorites(cls, song):
+        # TODO: check for existing album_id and other compulsory data
+        if isinstance(song, Song):
+            if not song.file_name:
+                found_song = cls._search_and_update_song_file_name(song)
+                if not found_song:
+                    config.logger.error(f'Song needs a file name. Not being able to get one provided from user.')
+                    raise Exception
+            if not song.album:
+                config.logger.error(f'Song needs an album.')
+                raise Exception
+            else:
+                if not song.album.id:
+                    config.logger.error(f'Song needs an album with an id.')
+                    raise Exception
+            try:
+                song = cls._musicdb.api_songs_update_song(song)
+            except ApiException as ex:
+                config.logger.exception(f'Error adding a new favorite song to server.')
+                raise ex
+        else:
+            config.logger.error(f'Song is not of Song type')
+
+    @classmethod
+    def add_reviews_batch(cls, reviews_path):
+        """
+            Gets reviews from text files and sets them in the corresponding albums.
+            :param reviews_path
+        """
+        try:
+            res_tree = cls._get_music_directory_tree()
+        except Exception as ex:
+            raise ex
+        else:
+            files_list = [f for f in os.listdir(reviews_path) if os.path.isfile(os.pah.join(reviews_path, f))]
+            for file_name in files_list:
+                full_name = os.path.join(reviews_path, file_name)
+                file_name_wo_ext = os.path.splitext(file_name)[0] # remove file extension
+                # get the info from the file name
+                # the pattern is BAND - ALBUM - SCORE
+                keys = file_name_wo_ext.split('-')
+                if len(keys) != 3:
+                    config.logger.error(f'The file {file_name} does not follow the pattern BAND - ALBUM - SCORE')
+                else:
+                    band_key = keys[0].casefold()
+                    album_key = keys[1].casefold()
+                    score = keys[2]
+                    found_album = False
+                    if band_key in res_tree:
+                        for key, album_obj in res_tree[band_key].items():
+                            if album_obj.title.casefold() == album_key:
+                                found_album = True
+                                # set the score
+                                album_obj.score = score
+                                try:
+                                    with open(full_name) as f:
+                                        review = f.read()
+                                except:
+                                    config.logger.exception(f'Could not open file {full_name}')
+                                else:
+                                    album_obj.review = review
+                                    try:
+                                        res_tree[band_key][key].merge(cls.update_album(album_obj))
+                                        res_tree[band_key][key].in_db = True
+                                    except:
+                                        config.logger.error(f'Could not update review for album {album_key} '
+                                                            f'for band {band_key}')
+                                    else:
+                                        # move the review file out
+                                        os.rename(full_name, os.path.join('/tmp', file_name))
+                                break
+                        if not found_album:
+                            config.logger.error(f'Could not find the album {album_key} for band {band_key} '
+                                                f'in the music directory.')
+                    else:
+                        config.logger.error(f'Could not find the band {band_key} in the music directory.')
+            return res_tree
+
+    @classmethod
+    def _get_music_directory_tree(cls):
+        """
+            Function that returns a nested dictionary with all files in the Music folder
+        """
+        if cls._music_dir_tree:
+            res_tree = cls._music_dir_tree
+        else:
+            # initialize dictionary to store the directory tree
+            dir_tree = {}
+            root_dir = cls._collection_root.rstrip(os.sep)  # remove leading whitespaces
+            config.logger.debug(f'Getting music directory tree from {root_dir}')
+            # recipe for getting the directory tree
+            start = root_dir.rfind(os.sep) + 1  # get the index for the name of the folder
+            for path, dirs, files in os.walk(root_dir):
+                folders = path[start:].split(os.sep)
+                subdir = dict.fromkeys(files)
+                parent = reduce(dict.get, folders[:-1], dir_tree)  # call dict.get on every element of the folders list
+                parent[folders[-1]] = subdir
+            # get the first value of the dictionary, we're not interested in the root name
+            try:
+                key, val = next(iter(dir_tree.items()))
+            except StopIteration as ex:
+                config.logger.exception("Could not get Music directory tree")
+                raise ex
+            res_tree = val
+        return res_tree
 
     @classmethod
     def _update_albums_from_collection(cls, add_to_db=False):
@@ -112,6 +244,8 @@ class MusicManager:
                 band_key = db_album.band.casefold().strip()
                 if band_key in res_tree:
                     # TODO: looping too many times on this tree, make something a bit more clever
+                    # making a key with the year and the title from the database will show some cases which
+                    # there's no match due to case sensitive match failures
                     for key, album_obj in res_tree[band_key].items():
                         if album_obj.title.casefold() == db_album.title.casefold():
                             album_obj.merge(db_album)
@@ -121,80 +255,19 @@ class MusicManager:
                     album_logger.warning(f'Band {db_album.band} not found in collection')
         # processing all missing albums from the database
         for band_key, album_dict in res_tree.items():
-            for album in album_dict.values():
+            for album_key, album in album_dict.items():
                 if not album.in_db:
                     if add_to_db:
                         # if we need to add to the database we call the server with this info
                         try:
-                            cls.update_album(album)
+                            res_tree[band_key][album_key].merge(cls.update_album(album))
+                            res_tree[band_key][album_key].in_db = True
                         except:
-                            config.logger.exception(f"Could not add album {album.title} of band {album.band} to the db.")
+                            config.logger.exception(
+                                f"Could not add album {album.title} of band {album.band} to the db.")
                     else:
                         album_logger.warning(f'Album {album.title} of band {album.band} not found in database')
         return res_tree
-
-    @classmethod
-    def get_albums_from_collection(cls):
-        """
-        Gets the albums collection from the configured Music Directory 
-        and compares with the database collection.
-        """
-        return cls._update_albums_from_collection()
-
-    @classmethod
-    def add_new_albums_from_collection_to_db(cls):
-        """
-            Adds all the albums from the collection that are not in the database yet.
-        """
-        return cls._update_albums_from_collection(True)
-
-    @classmethod
-    def update_album(cls, album):
-        """
-            Function to update the albums. 
-        """
-        try:
-            cls._music_db.api_albums_update_album(album)
-        except Exception as ex:
-            config.logger.exception(f'Could not update album with title {album.title}')
-            raise ex
-
-    @classmethod
-    def get_favorites(cls, quantity, score):
-        """
-            Gets a list with random songs from the favorites list that complies with the required score.
-            :param quantity, the number of songs to return
-            :param score, the minimum score of the song
-        """
-        fav_songs = []
-        # get a list from the database with the favorite songs
-        try:
-            if quantity:
-                result = cls._music_db.api_songs_get_songs(quantity=quantity, score=score)
-            else:
-                result = cls._music_db.api_songs_get_songs()
-        except Exception as ex:
-            config.logger.exception('Exception when getting favorite songs')
-            raise ex
-        else:
-            return cls._get_songs_in_fs(result.songs)
-
-    @classmethod
-    def add_song_to_favorites(cls, song):
-        # TODO: check for existing file_name, album_id and other compulsory data
-        if isinstance(song, Song):
-            if not song.file_name:
-                found_song = cls._search_and_update_song_file_name(song)
-                if not found_song:
-                    config.logger.error(f'Song needs a file name. Not being able to get one provided from user.')
-                    raise Exception
-            try:
-                cls._musicdb.api_songs_update_song(song)
-            except ApiException as ex:
-                config.logger.exception(f"Error adding a new favorite song to server.")
-                raise ex
-        else:
-            config.logger.error(f'song is not of Song type')
 
     @classmethod
     def _get_songs_in_fs(cls, song_list):

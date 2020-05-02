@@ -46,6 +46,7 @@ class GUI:
         self._music_db = config.music_db_api
         MusicManager.set_update_song_data_cb(self.update_song_data)
         MusicManager.set_update_album_data_cb(self.update_album_data)
+        self._albums_window = None
         # always initialize layout at the end because it contains the gui main loop
         self._init_main_window_layout()
 
@@ -87,6 +88,8 @@ class GUI:
         self._file_sub_menu.add_command(label="Open List", command=album_list_func)
         album_add_to_db_func = partial(self._execute_thread, self._add_albums_to_db_thread, self._show_album_list)
         self._file_sub_menu.add_command(label="Add albums from filesystem to DB", command=album_add_to_db_func)
+        album_add_to_db_func = partial(self._execute_thread, self._add_reviews_to_db_thread, self._show_album_list)
+        self._file_sub_menu.add_command(label="Add reviews from filesystem to DB", command=album_add_to_db_func)
         # Create the Play sub menu            
         self._play_sub_menu = Menu(self._menu_bar, tearoff=0)
         self._menu_bar.add_cascade(label="Play", menu=self._play_sub_menu)
@@ -213,154 +216,155 @@ class GUI:
         """
             Initializes the albums window layout
         """
-        self._albums_window = tk.ThemedTk()
-        self._albums_window.protocol("WM_DELETE_WINDOW", self._on_closing_album_window)
+        if not self._albums_window:
+            self._albums_window = tk.ThemedTk()
+            self._albums_window.protocol("WM_DELETE_WINDOW", self._on_closing_album_window)
 
-        self._albums_window.get_themes()  # Returns a list of all themes that can be set
-        self._albums_window.set_theme("radiance")  # Sets an available theme
-        self._albums_window.title("Album Search")
-        self._albums_window.geometry("1400x600")
+            self._albums_window.get_themes()  # Returns a list of all themes that can be set
+            self._albums_window.set_theme("radiance")  # Sets an available theme
+            self._albums_window.title("Album Search")
+            self._albums_window.geometry("1400x600")
 
-        self._album_status_bar = ttk.Label(self._albums_window, text="Album library", relief=SUNKEN, anchor=W,
-                                           font='Times 12')
-        self._album_status_bar.pack(side=BOTTOM, fill=X)
+            self._album_status_bar = ttk.Label(self._albums_window, text="Album library", relief=SUNKEN, anchor=W,
+                                               font='Times 12')
+            self._album_status_bar.pack(side=BOTTOM, fill=X)
 
-        # variable that stores the selected album
-        self._selected_album = None
-        self._selected_album_review_signature = None
+            # variable that stores the selected album
+            self._selected_album = None
+            self._selected_album_review_signature = None
 
-        # ALBUM WINDOW FRAMES STRUCTURE
+            # ALBUM WINDOW FRAMES STRUCTURE
 
-        self._top_album_frame = Frame(self._albums_window)
-        self._top_album_frame.pack(side=TOP, expand=True)
+            self._top_album_frame = Frame(self._albums_window)
+            self._top_album_frame.pack(side=TOP, expand=True)
 
-        self._left_album_frame = Frame(self._top_album_frame)
-        self._left_album_frame.pack(side=LEFT, padx=30, pady=30, expand=True)
+            self._left_album_frame = Frame(self._top_album_frame)
+            self._left_album_frame.pack(side=LEFT, padx=30, pady=30, expand=True)
 
-        self._right_album_frame = Frame(self._top_album_frame)
-        self._right_album_frame.pack(side=RIGHT, padx=30, pady=30, expand=True)
+            self._right_album_frame = Frame(self._top_album_frame)
+            self._right_album_frame.pack(side=RIGHT, padx=30, pady=30, expand=True)
 
-        self._bottom_album_frame = Frame(self._albums_window)
-        self._bottom_album_frame.pack(side=BOTTOM, expand=True)
+            self._bottom_album_frame = Frame(self._albums_window)
+            self._bottom_album_frame.pack(side=BOTTOM, expand=True)
 
-        # ALBUM LIST
-        v_scroll_bar = Scrollbar(self._left_album_frame, orient="vertical")
+            # ALBUM LIST
+            v_scroll_bar = Scrollbar(self._left_album_frame, orient="vertical")
 
-        self._album_listbox = ttk.Treeview(self._left_album_frame, yscrollcommand=v_scroll_bar.set, height=20)
-        self._album_listbox["columns"] = ('Band', 'Title', 'Style', 'Year', 'Location', 'Type', 'Score', 'InDB')
-        self._album_listbox.heading("Band", text="Band", anchor=W)
-        self._album_listbox.heading("Title", text="Title", anchor=W)
-        self._album_listbox.heading("Style", text="Style", anchor=W)
-        self._album_listbox.heading("Year", text="Year", anchor=W)
-        self._album_listbox.heading("Location", text="Location", anchor=W)
-        self._album_listbox.heading("Type", text="Type", anchor=W)
-        self._album_listbox.heading("Score", text="Score", anchor=W)
-        self._album_listbox.heading("InDB", text="In DB", anchor=W)
-        self._album_listbox["show"] = "headings"  # This will remove the first column from the viewer
-        # (first column of this widget is the identifier of the row)
-        # add functionality for sorting
-        for col in self._album_listbox["columns"]:
-            self._album_listbox.heading(col, text=col, command=lambda _col=col: \
-                GUI._tree_view_sort_column(self._album_listbox, _col, False))
+            self._album_listbox = ttk.Treeview(self._left_album_frame, yscrollcommand=v_scroll_bar.set, height=20)
+            self._album_listbox["columns"] = ('Band', 'Title', 'Style', 'Year', 'Location', 'Type', 'Score', 'InDB')
+            self._album_listbox.heading("Band", text="Band", anchor=W)
+            self._album_listbox.heading("Title", text="Title", anchor=W)
+            self._album_listbox.heading("Style", text="Style", anchor=W)
+            self._album_listbox.heading("Year", text="Year", anchor=W)
+            self._album_listbox.heading("Location", text="Location", anchor=W)
+            self._album_listbox.heading("Type", text="Type", anchor=W)
+            self._album_listbox.heading("Score", text="Score", anchor=W)
+            self._album_listbox.heading("InDB", text="In DB", anchor=W)
+            self._album_listbox["show"] = "headings"  # This will remove the first column from the viewer
+            # (first column of this widget is the identifier of the row)
+            # add functionality for sorting
+            for col in self._album_listbox["columns"]:
+                self._album_listbox.heading(col, text=col, command=lambda _col=col: \
+                    GUI._tree_view_sort_column(self._album_listbox, _col, False))
 
-        self._album_listbox.column("Band", minwidth=0, width=220)
-        self._album_listbox.column("Title", minwidth=0, width=280)
-        self._album_listbox.column("Style", minwidth=0, width=160)
-        self._album_listbox.column("Year", minwidth=0, width=50)
-        self._album_listbox.column("Location", minwidth=0, width=120)
-        self._album_listbox.column("Type", minwidth=0, width=120)
-        self._album_listbox.column("Score", minwidth=0, width=40)
-        self._album_listbox.column("InDB", minwidth=0, width=20)
+            self._album_listbox.column("Band", minwidth=0, width=220)
+            self._album_listbox.column("Title", minwidth=0, width=280)
+            self._album_listbox.column("Style", minwidth=0, width=160)
+            self._album_listbox.column("Year", minwidth=0, width=50)
+            self._album_listbox.column("Location", minwidth=0, width=120)
+            self._album_listbox.column("Type", minwidth=0, width=120)
+            self._album_listbox.column("Score", minwidth=0, width=40)
+            self._album_listbox.column("InDB", minwidth=0, width=20)
 
-        v_scroll_bar.config(command=self._album_listbox.yview)
-        v_scroll_bar.pack(side=RIGHT, fill=Y, expand=True)
+            v_scroll_bar.config(command=self._album_listbox.yview)
+            v_scroll_bar.pack(side=RIGHT, fill=Y, expand=True)
 
-        self._album_listbox.pack(side=LEFT, fill=BOTH, expand=True)
+            self._album_listbox.pack(side=LEFT, fill=BOTH, expand=True)
 
-        # review text
-        self._review_text_box = Text(self._bottom_album_frame,
-                                     font='Times 12', relief=GROOVE, height=100, width=100)
-        self._review_text_box.pack(side=BOTTOM, fill=BOTH, expand=True)
+            # review text
+            self._review_text_box = Text(self._bottom_album_frame,
+                                         font='Times 12', relief=GROOVE, height=100, width=100)
+            self._review_text_box.pack(side=BOTTOM, fill=BOTH, expand=True)
 
-        def do_album_list_popup(event):
-            # display the _album_list_popup menu
-            try:
-                self._album_list_popup.selection = self._album_listbox.identify_row(event.y)
-                self._album_list_popup.post(event.x_root, event.y_root)
-            finally:
-                # make sure to release the grab (Tk 8.0a1 only)
-                self._album_list_popup.grab_release()
+            def do_album_list_popup(event):
+                # display the _album_list_popup menu
+                try:
+                    self._album_list_popup.selection = self._album_listbox.identify_row(event.y)
+                    self._album_list_popup.post(event.x_root, event.y_root)
+                finally:
+                    # make sure to release the grab (Tk 8.0a1 only)
+                    self._album_list_popup.grab_release()
 
-        def do_album_list_play_album():
-            """
-                Plays selected album on popup
-            """
-            row = self._album_list_popup.selection
-            album = self._albums_list[row]
-            file_names = [f for f in listdir(album.path) if isfile(join(album.path, f))]
-            for file_name in file_names:
-                self._add_file_to_playlist(join(album.path, file_name), album)
-            self._play_music()
+            def do_album_list_play_album():
+                """
+                    Plays selected album on popup
+                """
+                row = self._album_list_popup.selection
+                album = self._albums_list[row]
+                file_names = [f for f in listdir(album.path) if isfile(join(album.path, f))]
+                for file_name in file_names:
+                    self._add_file_to_playlist(join(album.path, file_name), album)
+                self._play_music()
 
-        def do_album_selection(event):
-            """
-                Event on album selection, it will:
-                - Show the cover art from the selected album in _current_album_img
-                - Show the review of the album in _review_text_box
-            """
-            selection = self._album_listbox.identify_row(event.y)
-            try:
-                album = self._albums_list[selection]
-            except KeyError:
-                # if selected row is from the band root then we do not continue
-                pass
-            else:
-                # if there was a previous album let's check if we have to update the review
-                if self._selected_album:
-                    review = self._review_text_box.get(1.0, END)
-                    # it there was a review selected before we check the signature
-                    if self._selected_album_review_signature:
-                        if self._selected_album_review_signature != get_signature(review):
-                            config.logger.info(
-                                f"Review for album {self._selected_album.title} has changed. Updating the DB.")
-                            self._selected_album.review = review
-                            try:
-                                # TODO: test the save the review also when the window is closed.
-                                MusicManager.update_album(self._selected_album)
-                            except Exception as ex:
-                                config.logger.exception('Could not save album review.')
-                                messagebox.showerror('Error',
-                                                     message='Could not save album review. See log for errors.')
+            def do_album_selection(event):
+                """
+                    Event on album selection, it will:
+                    - Show the cover art from the selected album in _current_album_img
+                    - Show the review of the album in _review_text_box
+                """
+                selection = self._album_listbox.identify_row(event.y)
+                try:
+                    album = self._albums_list[selection]
+                except KeyError:
+                    # if selected row is from the band root then we do not continue
+                    pass
+                else:
+                    # if there was a previous album let's check if we have to update the review
+                    if self._selected_album:
+                        review = self._review_text_box.get(1.0, END)
+                        # it there was a review selected before we check the signature
+                        if self._selected_album_review_signature:
+                            if self._selected_album_review_signature != get_signature(review):
+                                config.logger.info(
+                                    f"Review for album {self._selected_album.title} has changed. Updating the DB.")
+                                self._selected_album.review = review
+                                try:
+                                    # TODO: test the save the review also when the window is closed.
+                                    MusicManager.update_album(self._selected_album)
+                                except Exception as ex:
+                                    config.logger.exception('Could not save album review.')
+                                    messagebox.showerror('Error',
+                                                         message='Could not save album review. See log for errors.')
 
-                # set the review text
-                self._review_text_box.delete(1.0, END)
-                if album.review:
-                    self._review_text_box.insert(END, album.review)
-                    self._selected_album_review_signature = get_signature(self._review_text_box.get(1.0, END))
-                # update selected album
-                self._selected_album = album
+                    # set the review text
+                    self._review_text_box.delete(1.0, END)
+                    if album.review:
+                        self._review_text_box.insert(END, album.review)
+                        self._selected_album_review_signature = get_signature(self._review_text_box.get(1.0, END))
+                    # update selected album
+                    self._selected_album = album
 
-                dim = Dimensions(250, 250)
-                # PhotoImage object must reside in memory
-                self._current_album_img = CoverArtManager.get_covert_art_for_album(album, self._albums_window, dim)
-                self._album_work_art_canvas.create_image(20, 20, anchor=NW, image=self._current_album_img)
+                    dim = Dimensions(250, 250)
+                    # PhotoImage object must reside in memory
+                    self._current_album_img = CoverArtManager.get_covert_art_for_album(album, self._albums_window, dim)
+                    self._album_work_art_canvas.create_image(20, 20, anchor=NW, image=self._current_album_img)
 
-        self._album_list_popup = Menu(self._albums_window, tearoff=0)
-        self._album_list_popup.add_command(label="Play this item", command=do_album_list_play_album)
+            self._album_list_popup = Menu(self._albums_window, tearoff=0)
+            self._album_list_popup.add_command(label="Play this item", command=do_album_list_play_album)
 
-        # add popup to album_list tree view
-        self._album_listbox.bind("<Button-3>", do_album_list_popup)
-        # add Cover art change to tree view selection
-        self._album_listbox.bind("<Button-1>", do_album_selection)
+            # add popup to album_list tree view
+            self._album_listbox.bind("<Button-3>", do_album_list_popup)
+            # add Cover art change to tree view selection
+            self._album_listbox.bind("<Button-1>", do_album_selection)
 
-        # album image
-        self._album_work_art_canvas = Canvas(self._top_album_frame, width=300, height=300)
-        self._album_work_art_canvas.pack(expand=True)
-        self._album_work_art_canvas_frame = self._album_work_art_canvas.create_window((0, 0),
-                                                                                      window=self._right_album_frame,
-                                                                                      anchor=NW)
+            # album image
+            self._album_work_art_canvas = Canvas(self._top_album_frame, width=300, height=300)
+            self._album_work_art_canvas.pack(expand=True)
+            self._album_work_art_canvas_frame = self._album_work_art_canvas.create_window((0, 0),
+                                                                                          window=self._right_album_frame,
+                                                                                          anchor=NW)
 
-        self._album_list_popup.selection = None
+            self._album_list_popup.selection = None
 
     # ------------------ TASKS EXECUTION -----------------------------------------------------#
     # ------------------ TASKS EXECUTION -----------------------------------------------------#
@@ -407,9 +411,10 @@ class GUI:
 
     def _browse_file(self):
         file_names = filedialog.askopenfilenames(parent=self._window_root, title="Choose files")
-        self._window_root.tk.splitlist(file_names)
-        for file_name in file_names:
-            self._add_file_to_playlist(file_name, None)
+        if file_names:
+            self._window_root.tk.splitlist(file_names)
+            for file_name in file_names:
+                self._add_file_to_playlist(file_name, None)
 
     # ----------------------- GET FAVORITE SONGS ---------------------------------------------#
 
@@ -508,6 +513,19 @@ class GUI:
             self._albums_from_server = MusicManager.add_new_albums_from_collection_to_db()
         except:
             config.logger.exception("Exception when getting album collection")
+
+    def _add_reviews_to_db_thread(self):
+        """
+            Thread to add reviews from the filesystem to the database.
+        """
+        self.status_bar['text'] = 'Adding reviews to database'
+        reviews_dir = filedialog.askdirectory(initialdir=config.MUSIC_PATH, parent=self._window_root,
+                                                title=f"Choose reviews path")
+        if reviews_dir:
+            try:
+                self._albums_from_server = MusicManager.add_reviews_batch(reviews_dir)
+            except:
+                config.logger.exception("Exception when updating reviews to album collection")
 
     # --------------- POP UP ACTIONS -----------------------------------------------------------#
 
@@ -704,6 +722,9 @@ class GUI:
         """
             Add input dict to album tree view
         """
+        # remove existing tree if there were any items
+        self._album_listbox.delete(*self._album_listbox.get_children())
+
         band_index = 1
         for band_key, albums in sorted(album_dict.items()):
             # add tags for identifying which background color to apply
@@ -725,18 +746,22 @@ class GUI:
             band_index += 1
             album_index = 1
             for album_key, album in albums.items():
-                # config.logger.debug(f"Adding album {album} to band {band}")                
-                album_id = self._album_listbox.insert(band_root, 'end',
-                                                      values=("",
-                                                              album.title,
-                                                              album.style,
-                                                              album.year,
-                                                              album.country,
-                                                              album.type,
-                                                              album.score,
-                                                              album.in_db))
-                self._albums_list[album_id] = album
-                album_index += 1
+                # config.logger.debug(f"Adding album {album} to band {band}")
+                try:
+                    album_id = self._album_listbox.insert(band_root, 'end',
+                                                          values=("",
+                                                                  album.title,
+                                                                  album.style,
+                                                                  album.year,
+                                                                  album.country,
+                                                                  album.type,
+                                                                  album.score,
+                                                                  album.in_db))
+                    self._albums_list[album_id] = album
+                    album_index += 1
+                except AttributeError:
+                    config.logger.error(f"Could not add album {album} to playlist")
+
         # apply background colors
         self._album_listbox.tag_configure('odd_row', background='#D9FFDB')
         self._album_listbox.tag_configure('even_row', background='#FFE5CD')
@@ -757,7 +782,7 @@ class GUI:
 
     def update_album_data(self, song):
         """
-            Callback function to update interactive.y album data.
+            Callback function to update interactively album data.
         """
         # TODO
         pass

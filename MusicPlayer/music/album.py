@@ -34,6 +34,10 @@ class Album(DB_album):
         self._path = path
 
     def merge(self, album):
+        """
+            Function to merge the Album server object type to this object type.
+            @param: the album server type
+        """
         in_dict = album.to_dict()
         self_dict = self.to_dict()
         self_dict.update(in_dict)
