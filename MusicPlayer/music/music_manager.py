@@ -232,7 +232,7 @@ class MusicManager:
                         album_obj.path = os.path.join(cls._collection_root, band, album)
                         if band_key not in res_tree:
                             res_tree[band_key] = {}
-                        res_tree[band_key][album] = album_obj
+                        res_tree[band_key][album.strip().casefold()] = album_obj
                     # TODO: add a configurable list of exceptions, for now we hardcode 'Misc' as exception
                     elif album != 'Misc':
                         album_logger.warning(
@@ -243,17 +243,21 @@ class MusicManager:
             for db_album in albums_list:
                 band_key = db_album.band.casefold().strip()
                 if band_key in res_tree:
-                    # TODO: looping too many times on this tree, make something a bit more clever
-                    # making a key with the year and the title from the database will show some cases which
-                    # there's no match due to case sensitive match failures
-                    for key, album_obj in res_tree[band_key].items():
-                        if album_obj.title.casefold() == db_album.title.casefold():
-                            album_obj.merge(db_album)
-                            album_obj.in_db = True
-                            break
+                    # TODO: look for an alternative solution for the albums with no year
+                    if db_album.year == '0':
+                        db_album.year = '0000'
+                    album_key = f'{db_album.year} - {db_album.title}'.strip().casefold()
+                    if album_key in res_tree[band_key]:
+                        res_tree[band_key][album_key].merge(db_album)
+                        res_tree[band_key][album_key].in_db = True
+                    else:
+                        # log missing album from collection
+                        album_logger.error(f"{db_album.title} from {db_album.year} "
+                                           f"from {db_album.band} not found")
+                        album_logger.error(f"Albums from that band are {res_tree[band_key].keys()}")
                 else:
                     album_logger.warning(f'Band {db_album.band} not found in collection')
-        # processing all missing albums from the database
+        # processing all missing albums in the database
         for band_key, album_dict in res_tree.items():
             for album_key, album in album_dict.items():
                 if not album.in_db:
