@@ -69,6 +69,7 @@ class MusicManager:
         """
             Function to update an album in the server.
         """
+        # TODO: validate that the album has the right data. Create a validate function on the Album class
         try:
             album = cls._music_db.api_albums_update_album(album)
         except Exception as ex:

@@ -291,9 +291,13 @@ class GUI:
                 try:
                     self._album_list_popup.selection = self._album_listbox.identify_row(event.y)
                     self._album_list_popup.post(event.x_root, event.y_root)
+                    #self._album_list_popup.focus_set()
                 finally:
                     # make sure to release the grab (Tk 8.0a1 only)
                     self._album_list_popup.grab_release()
+
+            def album_list_popup_focus_out(event=None):
+                self._album_list_popup.unpost()
 
             def do_album_list_play_album():
                 """
@@ -305,6 +309,12 @@ class GUI:
                 for file_name in file_names:
                     self._add_file_to_playlist(join(album.path, file_name), album)
                 self._play_music()
+
+            def do_album_edit():
+                """
+                    Edits the selected album
+                """
+                self._edit_album(self._albums_list[self._album_list_popup.selection])
 
             def do_album_selection(event):
                 """
@@ -350,12 +360,14 @@ class GUI:
                     self._album_work_art_canvas.create_image(20, 20, anchor=NW, image=self._current_album_img)
 
             self._album_list_popup = Menu(self._albums_window, tearoff=0)
-            self._album_list_popup.add_command(label="Play this item", command=do_album_list_play_album)
+            self._album_list_popup.add_command(label="Play this album", command=do_album_list_play_album)
+            self._album_list_popup.add_command(label="Edit this album", command=do_album_edit)
 
             # add popup to album_list tree view
             self._album_listbox.bind("<Button-3>", do_album_list_popup)
             # add Cover art change to tree view selection
             self._album_listbox.bind("<Button-1>", do_album_selection)
+            self._album_listbox.bind("<FocusOut>", album_list_popup_focus_out)
 
             # album image
             self._album_work_art_canvas = Canvas(self._top_album_frame, width=300, height=300)
@@ -546,6 +558,53 @@ class GUI:
                 messagebox.showerror("Error", "Error adding a new favorite song. Please check logging.")
 
     # ----------------------- BUTTONS ACTIONS -------------------------------------------#
+
+    class AlbumEditWindow(object):
+        """
+            Window for editing album
+        """
+
+        def __init__(self, master, album):
+            top = self.top = Toplevel(master)
+            self.label = Label(top, text=f"Editing album with title {album.title} of band {album.band}")
+            self.label.pack()
+            self.style_entry = Entry(top)
+            self.style_entry.pack()
+            self.style_entry.insert(END, album.style)
+            self.year_entry = Entry(top)
+            self.year_entry.pack()
+            self.year_entry.insert(END, album.year)
+            self.country_entry = Entry(top)
+            self.country_entry.pack()
+            self.country_entry.insert(END, album.country)
+            self.type_entry = Entry(top)
+            self.type_entry.pack()
+            self.type_entry.insert(END, album.type)
+            self.score_entry = Entry(top)
+            self.score_entry.pack()
+            self.score_entry.insert(END, album.score)
+            self._review_text_box_album = Text(top, font='Times 12', relief=GROOVE, height=20, width=100)
+            self._review_text_box_album.pack()
+            self._review_text_box_album.insert(END, album.review)
+            self.button = Button(top, text='Save', command=self.cleanup)
+            self.button.pack()
+            self.album = album
+            # TODO: add labels for the entries above
+
+        def cleanup(self):
+            self.album.style = self.style_entry.get()
+            self.album.year = self.year_entry.get()
+            self.album.country = self.country_entry.get()
+            self.album.type = self.type_entry.get()
+            self.album.score = self.score_entry.get()
+            self.album.review = self._review_text_box_album.get()
+            self.top.destroy()
+
+    def _edit_album(self, album):
+        album_window = self.AlbumEditWindow(self._window_root, album)
+        self._window_root.wait_window(album_window.top)
+        # TODO: uncomment when album validation is ready
+        #MusicManager.update_album(album_window.album)
 
     def _delete_song(self):
         """
