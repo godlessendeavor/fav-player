@@ -5,6 +5,8 @@ Created on Nov 28, 2019
 """
 
 from musicdb_client.models.album import Album as DB_album
+import config
+import datetime
 
 
 class Album(DB_album):
@@ -42,6 +44,28 @@ class Album(DB_album):
         self_dict = self.to_dict()
         self_dict.update(in_dict)
         self.from_dict(self_dict)
+
+    def validate(self):
+        try:
+            year = int(self._year)
+        except:
+            config.logger.error(f"Year of album is not an Integer")
+            return False
+        else:
+            now = datetime.datetime.now()
+            if year < 1900 or year > now.year:
+                config.logger.error(f"Year of album is not correct {year}")
+                return False
+        try:
+            score = float(self._score)
+        except:
+            config.logger.error(f"Score of album is not a Float")
+            return False
+        else:
+            if score < 0.0 or score > 10.0:
+                config.logger.error(f"Score of album is not correct {self._score}")
+                return False
+        return True
 
     def from_dict(self, album_dict):
         if 'id' in album_dict:

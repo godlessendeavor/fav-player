@@ -69,14 +69,16 @@ class MusicManager:
         """
             Function to update an album in the server.
         """
-        # TODO: validate that the album has the right data. Create a validate function on the Album class
-        try:
-            album = cls._music_db.api_albums_update_album(album)
-        except Exception as ex:
-            config.logger.exception(f'Could not update album with title {album.title}')
-            raise ex
+        if album.validate():
+            try:
+                album = cls._music_db.api_albums_update_album(album)
+            except Exception as ex:
+                config.logger.exception(f'Could not update album with title {album.title}')
+                raise ex
+            else:
+                return album
         else:
-            return album
+            config.logger(f"Some problem with validation of album {album.title}")
 
     @classmethod
     def get_favorites(cls, quantity, score):

@@ -88,8 +88,8 @@ class GUI:
         self._file_sub_menu.add_command(label="Open List", command=album_list_func)
         album_add_to_db_func = partial(self._execute_thread, self._add_albums_to_db_thread, self._show_album_list)
         self._file_sub_menu.add_command(label="Add albums from filesystem to DB", command=album_add_to_db_func)
-        album_add_to_db_func = partial(self._execute_thread, self._add_reviews_to_db_thread, self._show_album_list)
-        self._file_sub_menu.add_command(label="Add reviews from filesystem to DB", command=album_add_to_db_func)
+        review_add_to_db_func = partial(self._execute_thread, self._add_reviews_to_db_thread, self._show_album_list)
+        self._file_sub_menu.add_command(label="Add reviews from filesystem to DB", command=review_add_to_db_func)
         # Create the Play sub menu            
         self._play_sub_menu = Menu(self._menu_bar, tearoff=0)
         self._menu_bar.add_cascade(label="Play", menu=self._play_sub_menu)
@@ -291,7 +291,7 @@ class GUI:
                 try:
                     self._album_list_popup.selection = self._album_listbox.identify_row(event.y)
                     self._album_list_popup.post(event.x_root, event.y_root)
-                    #self._album_list_popup.focus_set()
+                    # self._album_list_popup.focus_set()
                 finally:
                     # make sure to release the grab (Tk 8.0a1 only)
                     self._album_list_popup.grab_release()
@@ -526,13 +526,15 @@ class GUI:
         except:
             config.logger.exception("Exception when getting album collection")
 
+    # --------------------------- UPDATE REVIEWS ----------------------------------------------#
+
     def _add_reviews_to_db_thread(self):
         """
             Thread to add reviews from the filesystem to the database.
         """
         self.status_bar['text'] = 'Adding reviews to database'
         reviews_dir = filedialog.askdirectory(initialdir=config.MUSIC_PATH, parent=self._window_root,
-                                                title=f"Choose reviews path")
+                                              title=f"Choose reviews path")
         if reviews_dir:
             try:
                 self._albums_from_server = MusicManager.add_reviews_batch(reviews_dir)
@@ -566,40 +568,40 @@ class GUI:
 
         def __init__(self, master, album):
             top = self.top = Toplevel(master)
-            self.label = Label(top, text=f'Editing album with title "{album.title}" of band "{album.band}"')
-            self.label.grid(row=0, column=0)
-            style_label = Label(top, text="Style", height=4)
+            desc_label = Label(top, text=f'Editing album with title "{album.title}" of band "{album.band}"')
+            desc_label.grid(row=0, column=1)
+            style_label = Label(top, text="Style")
             style_label.grid(row=1, column=0)
             self.style_entry = Entry(top)
             self.style_entry.grid(row=1, column=1)
             self.style_entry.insert(END, album.style)
-            year_label = Label(top, text="Year", height=4)
+            year_label = Label(top, text="Year")
             year_label.grid(row=2, column=0)
             self.year_entry = Entry(top)
             self.year_entry.grid(row=2, column=1)
             self.year_entry.insert(END, album.year)
-            country_label = Label(top, text="Country/State", height=4)
+            country_label = Label(top, text="Country/State")
             country_label.grid(row=3, column=0)
             self.country_entry = Entry(top)
             self.country_entry.grid(row=3, column=1)
             self.country_entry.insert(END, album.country)
-            type_label = Label(top, text="Type", height=4)
+            type_label = Label(top, text="Type")
             type_label.grid(row=4, column=0)
             self.type_entry = Entry(top)
             self.type_entry.grid(row=4, column=1)
             self.type_entry.insert(END, album.type)
-            score_label = Label(top, text="Score", height=4)
+            score_label = Label(top, text="Score")
             score_label.grid(row=5, column=0)
             self.score_entry = Entry(top)
-            self.score_entry.grid(row=5,column=1)
+            self.score_entry.grid(row=5, column=1)
             self.score_entry.insert(END, album.score)
-            review_label = Label(top, text="Review", height=4)
-            review_label.grid(row=6,column=0)
+            review_label = Label(top, text="Review")
+            review_label.grid(row=6, column=0)
             self._review_text_box_album = Text(top, font='Times 12', relief=GROOVE, height=15, width=100)
-            self._review_text_box_album.grid(row=6,column=1)
+            self._review_text_box_album.grid(row=6, column=1)
             self._review_text_box_album.insert(END, album.review)
-            self.button = Button(top, text='Save', command=self.cleanup)
-            self.button.grid(row=7,column=0)
+            button = Button(top, text='Save', command=self.cleanup)
+            button.grid(row=7, column=1)
             self.album = album
 
         def cleanup(self):
@@ -608,14 +610,18 @@ class GUI:
             self.album.country = self.country_entry.get()
             self.album.type = self.type_entry.get()
             self.album.score = self.score_entry.get()
-            self.album.review = self._review_text_box_album.get()
+            self.album.review = self._review_text_box_album.get(1.0, END)
             self.top.destroy()
 
     def _edit_album(self, album):
         album_window = self.AlbumEditWindow(self._window_root, album)
         self._window_root.wait_window(album_window.top)
-        # TODO: uncomment when album validation is ready
-        #MusicManager.update_album(album_window.album)
+        try:
+            MusicManager.update_album(album_window.album)
+        except:
+            config.logger.error(f"Could not save album with title {album.title}")
+        else:
+            self._refresh_album_list()
 
     def _delete_song(self):
         """
@@ -793,7 +799,10 @@ class GUI:
             Add input dict to album tree view
         """
         # remove existing tree if there were any items
-        self._album_listbox.delete(*self._album_listbox.get_children())
+        try:
+            self._album_listbox.delete(*self._album_listbox.get_children())
+        except:
+            config.logger.warning("Some error when refreshing album list")
 
         band_index = 1
         for band_key, albums in sorted(album_dict.items()):
@@ -835,6 +844,14 @@ class GUI:
         # apply background colors
         self._album_listbox.tag_configure('odd_row', background='#D9FFDB')
         self._album_listbox.tag_configure('even_row', background='#FFE5CD')
+
+    def _refresh_album_list(self):
+        """
+            Refreshes the album list.
+        """
+        self._execute_thread(self._get_album_list_thread)
+        self._add_to_album_list(self._albums_from_server)
+        self.status_bar['text'] = 'Album list ready'
 
     def update_song_data(self, song):
         """
