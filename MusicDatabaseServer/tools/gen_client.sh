@@ -21,6 +21,10 @@ then
   sudo python3 setup.py sdist # create distribution
   python3 -m twine upload dist/*
 else
-  sudo python3 setup.py install --force # install and upgrade if existing
+  sudo chown thrasher dist
+  python3 setup.py install --force # install and upgrade if existing # TODO: check if pipenv is used with an argument
+  wheel convert musicdb_client-1.0.3-py3.6.egg # TODO: version number to variable
+  cd -
+  pipenv install /tmp/python_api_client/dist/musicdb_client-1.0.3-py36-none-any.whl
 fi
 

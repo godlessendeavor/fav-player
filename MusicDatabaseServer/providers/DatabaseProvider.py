@@ -222,21 +222,33 @@ class DatabaseProvider(object):
             logger.exception('Exception on value when creating album.')
             return album, 400
         # now copy optional fields
-        try:
-            album_entry.score = float(album['score'])
+        if 'score' in album:
+            try:
+                album_entry.score = float(album['score'])
+            except ValueError as ex:
+                logger.warning('Exception on score when creating album %s. %s', album, ex)
+        if 'review' in album:
             album_entry.review = album['review']
+        if 'type' in album:
             album_entry.type = album['type']
+        if 'country' in album:
             album_entry.country = album['country']
+        if 'copy' in album:
             album_entry.copy = album['copy']
+        if 'style' in album:
             album_entry.style = album['style']
-        except KeyError as ex:
-            logger.warning('Type was not provided for album: %s. %s', album, ex)
-        except ValueError as ex:
-            logger.warning('Exception on value when creating album %s. %s', album, ex)
-            # save object in database
+        # if an update is done we will need the id as well
+        if 'id' in album:
+            album_entry.id = album['id']
+        # save object in database
         logger.debug(f'Saving album {album_entry} in database')
-        album_entry.save()
-        return album, 200
+        if album_entry.save():
+            album['id'] = album_entry.id
+            return album, 200
+        else:
+            # TODO: how to identify a failure from a case where there are no changes
+            logger.error(f'Could not save album {album_entry} in database. Maybe there are no changes')
+            return album, 400
 
     @database_mgmt
     def update_album(self, album) -> str:
