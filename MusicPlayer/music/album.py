@@ -19,6 +19,15 @@ class Album(DB_album):
         self._in_db = None
         self._path = None
 
+    def __eq__(self, other):
+        """Returns true if both objects are equal"""
+        if not isinstance(other, Album):
+            return False
+        return self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
     @property
     def in_db(self):
         return self._in_db

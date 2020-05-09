@@ -54,6 +54,10 @@ class MusicManager:
         """
             Gets the albums collection from the configured Music Directory
             and compares with the database collection.
+            @return tuple containing:
+            1) the dict of validated albums from collection
+            2) the new albums added to the collection (Always empty)
+            3) the albums not in the database
         """
         return cls._update_albums_from_collection()
 
@@ -61,6 +65,10 @@ class MusicManager:
     def add_new_albums_from_collection_to_db(cls):
         """
             Adds all the albums from the collection that are not in the database yet.
+            @return tuple containing:
+            1) the dict of validated albums from collection
+            2) the new albums added to the collection (duplicated from the 1st param in this tuple)
+            3) the albums not in the database.
         """
         return cls._update_albums_from_collection(True)
 
@@ -102,7 +110,7 @@ class MusicManager:
 
     @classmethod
     def add_song_to_favorites(cls, song):
-        # TODO: check for existing album_id and other compulsory data
+        # TODO: check for existing album_id and other compulsory data. Add validate function to song class
         if isinstance(song, Song):
             if not song.file_name:
                 found_song = cls._search_and_update_song_file_name(song)
@@ -217,6 +225,10 @@ class MusicManager:
         dir_tree = cls._get_music_directory_tree()
         # this will be our directory tree with the validated albums
         res_tree = {}
+        # this tree will contain the non-validated ones
+        wrong_albums = {}
+        # and this tree will contain the new added albums to the database
+        new_albums = {}
         # let's check that the folders match our format Year - Title
         for band, albums in list(dir_tree.items()):
             if albums:
@@ -240,6 +252,9 @@ class MusicManager:
                     elif album != 'Misc':
                         album_logger.warning(
                             'Album {album} of {band} is not following the format'.format(album=album, band=band))
+                        if band_key not in wrong_albums:
+                            wrong_albums[band_key] = {}
+                        wrong_albums[band_key][album] = None
         # now let's check the database
         albums_list = cls._music_db.api_albums_get_albums()
         if isinstance(albums_list, list):
@@ -258,6 +273,9 @@ class MusicManager:
                         album_logger.error(f"{db_album.title} from {db_album.year} "
                                            f"from {db_album.band} not found")
                         album_logger.error(f"Albums from that band are {res_tree[band_key].keys()}")
+                        if band_key not in wrong_albums:
+                            wrong_albums[band_key] = {}
+                        wrong_albums[band_key][album_key] = db_album
                 else:
                     album_logger.warning(f'Band {db_album.band} not found in collection')
         # processing all missing albums in the database
@@ -269,12 +287,18 @@ class MusicManager:
                         try:
                             res_tree[band_key][album_key].merge(cls.update_album(album))
                             res_tree[band_key][album_key].in_db = True
+                            if band_key not in new_albums:
+                                new_albums[band_key] = {}
+                            new_albums[band_key][album_key] = album
                         except:
                             config.logger.exception(
                                 f"Could not add album {album.title} of band {album.band} to the db.")
+                            if band_key not in wrong_albums:
+                                wrong_albums[band_key] = {}
+                            wrong_albums[band_key][album_key] = album
                     else:
                         album_logger.warning(f'Album {album.title} of band {album.band} not found in database')
-        return res_tree
+        return res_tree, new_albums, wrong_albums
 
     @classmethod
     def _get_songs_in_fs(cls, song_list):

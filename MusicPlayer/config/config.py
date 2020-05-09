@@ -50,5 +50,3 @@ _music_db_config.access_token = MUSIC_DB_TOKEN
 _music_db_config.logger_file_handler = logger
 
 music_db_api = musicdb_client.PublicApi(musicdb_client.ApiClient(_music_db_config))
-                                        
-                                        

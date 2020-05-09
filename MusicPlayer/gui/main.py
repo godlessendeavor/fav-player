@@ -1,3 +1,4 @@
+import copy
 import threading
 import time
 import hashlib
@@ -291,7 +292,6 @@ class GUI:
                 try:
                     self._album_list_popup.selection = self._album_listbox.identify_row(event.y)
                     self._album_list_popup.post(event.x_root, event.y_root)
-                    # self._album_list_popup.focus_set()
                 finally:
                     # make sure to release the grab (Tk 8.0a1 only)
                     self._album_list_popup.grab_release()
@@ -304,21 +304,29 @@ class GUI:
                     Plays selected album on popup
                 """
                 row = self._album_list_popup.selection
-                album = self._albums_list[row]
-                file_names = [f for f in listdir(album.path) if isfile(join(album.path, f))]
-                for file_name in file_names:
-                    self._add_file_to_playlist(join(album.path, file_name), album)
-                self._play_music()
+                try:
+                    album = self._albums_list[row]
+                except KeyError:
+                    # not an album but a band key, do not play
+                    pass
+                else:
+                    file_names = [f for f in listdir(album.path) if isfile(join(album.path, f))]
+                    for file_name in file_names:
+                        self._add_file_to_playlist(join(album.path, file_name), album)
+                    self._play_music()
 
             def do_album_edit():
                 """
                     Edits the selected album
                 """
-                self._edit_album(self._albums_list[self._album_list_popup.selection])
+                try:
+                    self._edit_album(self._albums_list[self._album_list_popup.selection])
+                except KeyError:
+                    # not an album but a band key, do not play
+                    pass
 
             def do_album_selection(event):
-                """
-                    Event on album selection, it will:
+                """Event on album selection, it will:
                     - Show the cover art from the selected album in _current_album_img
                     - Show the review of the album in _review_text_box
                 """
@@ -512,7 +520,10 @@ class GUI:
         """
         self.status_bar['text'] = 'Getting album list'
         try:
-            self._albums_from_server = MusicManager.get_albums_from_collection()
+            self._albums_from_server, _, wrong_albums = MusicManager.get_albums_from_collection()
+            if wrong_albums:
+                message = f"The following albums are not correct {wrong_albums}"
+                self.InfoWindow(self._window_root, message)
         except:
             config.logger.exception("Exception when getting album collection")
 
@@ -522,7 +533,13 @@ class GUI:
         """
         self.status_bar['text'] = 'Adding albums to database'
         try:
-            self._albums_from_server = MusicManager.add_new_albums_from_collection_to_db()
+            self._albums_from_server, new_albums, wrong_albums = MusicManager.add_new_albums_from_collection_to_db()
+            if wrong_albums:
+                message = f"The following albums are not correct {wrong_albums}"
+                self.InfoWindow(self._window_root, message)
+            if new_albums:
+                message = f"The following albums were added to the database {new_albums}"
+                self.InfoWindow(self._window_root, message)
         except:
             config.logger.exception("Exception when getting album collection")
 
@@ -563,7 +580,7 @@ class GUI:
 
     class AlbumEditWindow(object):
         """
-            Window for editing album
+            Window for editing album fields.
         """
 
         def __init__(self, master, album):
@@ -600,28 +617,36 @@ class GUI:
             self._review_text_box_album = Text(top, font='Times 12', relief=GROOVE, height=15, width=100)
             self._review_text_box_album.grid(row=6, column=1)
             self._review_text_box_album.insert(END, album.review)
-            button = Button(top, text='Save', command=self.cleanup)
+            button = Button(top, text='Save', command=self.save)
             button.grid(row=7, column=1)
             self.album = album
 
-        def cleanup(self):
+        def save(self):
             self.album.style = self.style_entry.get()
             self.album.year = self.year_entry.get()
             self.album.country = self.country_entry.get()
             self.album.type = self.type_entry.get()
             self.album.score = self.score_entry.get()
-            self.album.review = self._review_text_box_album.get(1.0, END)
+            self.album.review = self._review_text_box_album.get(1.0, END)[:-1]
             self.top.destroy()
 
     def _edit_album(self, album):
+        """
+            Edits an album interactively.
+            It will open a window to edit the different fields for the given album.
+            After the album is saved the albums_window will be refreshed.
+            @param: album, the album to edit
+        """
+        old_album = copy.deepcopy(album)
         album_window = self.AlbumEditWindow(self._window_root, album)
         self._window_root.wait_window(album_window.top)
         try:
-            MusicManager.update_album(album_window.album)
+            if old_album != album_window.album:
+                MusicManager.update_album(album_window.album)
+                self._refresh_album_list()
         except:
             config.logger.error(f"Could not save album with title {album.title}")
-        else:
-            self._refresh_album_list()
+
 
     def _delete_song(self):
         """
@@ -705,6 +730,20 @@ class GUI:
             self._volume_scale.set(0)
             self._muted = TRUE
 
+    # ------------------------- Other Window helpers ------------------------------------------#
+
+    class InfoWindow(object):
+        """Window for showing some info.
+        Args:
+            master, the master window
+            message, the message to show in the window label
+        """
+
+        def __init__(self, master, message):
+            top = self.top = Toplevel(master)
+            self.label = Label(top, text=message)
+            self.label.pack()
+
     # ------------------------- GUI EVENTS ------------------------------------------#
 
     def _on_closing(self):
@@ -732,10 +771,10 @@ class GUI:
                 if self._selected_album_review_signature != get_signature(review):
                     config.logger.info(f"Review for album {self._selected_album.title} has changed. Updating the DB.")
                     self._selected_album.review = review
-                try:
-                    MusicManager.update_album(self._selected_album)
-                except Exception as ex:
-                    config.logger.exception('Could not save album review.')
+                    try:
+                        MusicManager.update_album(self._selected_album)
+                    except Exception as ex:
+                        config.logger.exception('Could not save album review.')
         if hasattr(self, '_albums_window'):
             try:
                 self._albums_window.destroy()
@@ -777,8 +816,9 @@ class GUI:
                 self._add_song_to_playlist(song)
 
     def _add_song_to_playlist(self, song):
-        """
-            Adds song to GUI playlist and to the player.
+        """Adds song to GUI playlist and to the player.
+            Args:
+                song (Song): the song to add
         """
         if song:
             pl_index = self._playlistbox.insert("", 'end', text="Band Name",
@@ -795,9 +835,11 @@ class GUI:
             config.logger.error(f'There was no song to add to playlist')
 
     def _add_to_album_list(self, album_dict):
+        """Add input dict to album tree view
+        Args:
+            album_dict (dict): the dict of albums to add to the album list.
         """
-            Add input dict to album tree view
-        """
+
         # remove existing tree if there were any items
         try:
             self._album_listbox.delete(*self._album_listbox.get_children())
@@ -867,12 +909,12 @@ class GUI:
         else:
             return None
 
-    def update_album_data(self, song):
+    def update_album_data(self, album):
         """
             Callback function to update interactively album data.
         """
-        # TODO
-        pass
+        # TODO: check this
+        self._edit_album(album)
 
     def _show_details(self):
         """
