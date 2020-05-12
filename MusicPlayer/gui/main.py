@@ -347,7 +347,6 @@ class GUI:
                                     f"Review for album {self._selected_album.title} has changed. Updating the DB.")
                                 self._selected_album.review = review
                                 try:
-                                    # TODO: test the save the review also when the window is closed.
                                     MusicManager.update_album(self._selected_album)
                                 except Exception as ex:
                                     config.logger.exception('Could not save album review.')
@@ -522,7 +521,11 @@ class GUI:
         try:
             self._albums_from_server, _, wrong_albums = MusicManager.get_albums_from_collection()
             if wrong_albums:
-                message = f"The following albums are not correct {wrong_albums}"
+                albums_list = []
+                for band in wrong_albums:
+                    for album in wrong_albums[band]:
+                        albums_list.append(f"{album} from {band}")
+                message = f"The following albums are not correct {albums_list}"
                 self.InfoWindow(self._window_root, message)
         except:
             config.logger.exception("Exception when getting album collection")
@@ -535,10 +538,18 @@ class GUI:
         try:
             self._albums_from_server, new_albums, wrong_albums = MusicManager.add_new_albums_from_collection_to_db()
             if wrong_albums:
-                message = f"The following albums are not correct {wrong_albums}"
+                albums_list = []
+                for band in wrong_albums:
+                    for album in wrong_albums[band]:
+                        albums_list.append(f"{album} from {band}")
+                message = f"The following albums are not correct {albums_list}"
                 self.InfoWindow(self._window_root, message)
             if new_albums:
-                message = f"The following albums were added to the database {new_albums}"
+                albums_list = []
+                for band in new_albums:
+                    for album in new_albums[band]:
+                        albums_list.append(f"{album} from {band}")
+                message = f"The following albums were added to the database {albums_list}"
                 self.InfoWindow(self._window_root, message)
         except:
             config.logger.exception("Exception when getting album collection")
@@ -591,42 +602,44 @@ class GUI:
             style_label.grid(row=1, column=0)
             self.style_entry = Entry(top)
             self.style_entry.grid(row=1, column=1)
-            self.style_entry.insert(END, album.style)
+            self.style_entry.insert(END, str(album.style) if album.style  else '')
             year_label = Label(top, text="Year")
             year_label.grid(row=2, column=0)
             self.year_entry = Entry(top)
             self.year_entry.grid(row=2, column=1)
-            self.year_entry.insert(END, album.year)
+            self.year_entry.insert(END, str(album.year) if album.year else '')
             country_label = Label(top, text="Country/State")
             country_label.grid(row=3, column=0)
             self.country_entry = Entry(top)
             self.country_entry.grid(row=3, column=1)
-            self.country_entry.insert(END, album.country)
+            self.country_entry.insert(END, str(album.country) if album.country else '')
             type_label = Label(top, text="Type")
             type_label.grid(row=4, column=0)
             self.type_entry = Entry(top)
             self.type_entry.grid(row=4, column=1)
-            self.type_entry.insert(END, album.type)
+            self.type_entry.insert(END, str(album.type) if album.type else '')
             score_label = Label(top, text="Score")
             score_label.grid(row=5, column=0)
             self.score_entry = Entry(top)
             self.score_entry.grid(row=5, column=1)
-            self.score_entry.insert(END, album.score)
+            self.score_entry.insert(END, str(album.score) if album.score else '')
             review_label = Label(top, text="Review")
             review_label.grid(row=6, column=0)
             self._review_text_box_album = Text(top, font='Times 12', relief=GROOVE, height=15, width=100)
             self._review_text_box_album.grid(row=6, column=1)
-            self._review_text_box_album.insert(END, album.review)
+            self._review_text_box_album.insert(END, str(album.review) if album.review else '')
             button = Button(top, text='Save', command=self.save)
             button.grid(row=7, column=1)
             self.album = album
 
         def save(self):
-            self.album.style = self.style_entry.get()
-            self.album.year = self.year_entry.get()
-            self.album.country = self.country_entry.get()
-            self.album.type = self.type_entry.get()
-            self.album.score = self.score_entry.get()
+            self.album.style = self.style_entry.get().strip()
+            self.album.year = self.year_entry.get().strip()
+            self.album.country = self.country_entry.get().strip()
+            self.album.type = self.type_entry.get().strip()
+            self.album.score = self.score_entry.get().strip()
+            # when getting the text from the widget it will ad a newline that
+            # will have to be removed manually with [:-1]
             self.album.review = self._review_text_box_album.get(1.0, END)[:-1]
             self.top.destroy()
 
@@ -643,10 +656,13 @@ class GUI:
         try:
             if old_album != album_window.album:
                 MusicManager.update_album(album_window.album)
+                # remove the selected album so review is not updated again
+                self._selected_album = None
+                # TODO: check why the refresh does not update the last edited album
                 self._refresh_album_list()
         except:
             config.logger.error(f"Could not save album with title {album.title}")
-
+            messagebox.showerror('Editor error', f"Could not save album with title {album.title}")
 
     def _delete_song(self):
         """
@@ -778,6 +794,7 @@ class GUI:
         if hasattr(self, '_albums_window'):
             try:
                 self._albums_window.destroy()
+                self._albums_window = None
             except Exception:
                 # window might have already been destroyed
                 pass

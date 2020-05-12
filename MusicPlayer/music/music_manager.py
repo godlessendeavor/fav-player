@@ -84,6 +84,7 @@ class MusicManager:
                 config.logger.exception(f'Could not update album with title {album.title}')
                 raise ex
             else:
+                config.logger.debug(f"Album {album.title} saved to the database")
                 return album
         else:
             config.logger(f"Some problem with validation of album {album.title}")
@@ -233,12 +234,12 @@ class MusicManager:
         for band, albums in list(dir_tree.items()):
             if albums:
                 for album in albums:
+                    album_obj = Album()
+                    album_obj.band = band
                     # check that it complies with the "YEAR - TITLE" rule
                     x = re.search("[0-9][ ]+-[ ]+.+", album)
                     if x:
                         # replace the album key with the object from Album class and fill it
-                        album_obj = Album()
-                        album_obj.band = band
                         band_key = band.casefold()
                         # split to max one '-'
                         album_split = album.split('-', 1)
@@ -252,9 +253,11 @@ class MusicManager:
                     elif album != 'Misc':
                         album_logger.warning(
                             'Album {album} of {band} is not following the format'.format(album=album, band=band))
+                        album_obj.title = album
+                        # TODO add functions to avoid the code duplicate of adding the wrong albums (also for new_Albums)
                         if band_key not in wrong_albums:
                             wrong_albums[band_key] = {}
-                        wrong_albums[band_key][album] = None
+                        wrong_albums[band_key][album] = album_obj
         # now let's check the database
         albums_list = cls._music_db.api_albums_get_albums()
         if isinstance(albums_list, list):
@@ -298,6 +301,9 @@ class MusicManager:
                             wrong_albums[band_key][album_key] = album
                     else:
                         album_logger.warning(f'Album {album.title} of band {album.band} not found in database')
+                        if band_key not in wrong_albums:
+                            wrong_albums[band_key] = {}
+                        wrong_albums[band_key][album_key] = album
         return res_tree, new_albums, wrong_albums
 
     @classmethod

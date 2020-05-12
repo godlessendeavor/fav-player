@@ -5,7 +5,7 @@ Created on Nov 28, 2019
 """
 
 from musicdb_client.models.album import Album as DB_album
-import config
+from config import config
 import datetime
 
 
@@ -65,15 +65,16 @@ class Album(DB_album):
             if year < 1900 or year > now.year:
                 config.logger.error(f"Year of album is not correct {year}")
                 return False
-        try:
-            score = float(self._score)
-        except:
-            config.logger.error(f"Score of album is not a Float")
-            return False
-        else:
-            if score < 0.0 or score > 10.0:
-                config.logger.error(f"Score of album is not correct {self._score}")
+        if self._score and not self._score.isspace():
+            try:
+                score = float(self._score)
+            except:
+                config.logger.error(f"Score of album is not a Float")
                 return False
+            else:
+                if score < 0.0 or score > 10.0:
+                    config.logger.error(f"Score of album is not correct {self._score}")
+                    return False
         return True
 
     def from_dict(self, album_dict):
