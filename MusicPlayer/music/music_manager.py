@@ -275,9 +275,6 @@ class MusicManager:
                     if album_key in res_tree[band_key]:
                         res_tree[band_key][album_key].merge(db_album)
                         res_tree[band_key][album_key].in_db = True
-                        #TODO: remove when refresh thing is solved
-                        if int(db_album.id) > 7091:
-                            config.logger.info(f"Getting album {db_album}")
                     else:
                         # log missing album from collection
                         album_logger.error(f"{db_album.title} from {db_album.year} "

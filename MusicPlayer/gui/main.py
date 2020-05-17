@@ -555,7 +555,7 @@ class GUI:
         """
         self.status_bar['text'] = 'Adding albums to database'
         try:
-            self._albums_from_server, new_albums, wrong_albums = MusicManager.add_new_albums_from_collection_to_db()
+            albums_from_server, new_albums, wrong_albums = MusicManager.add_new_albums_from_collection_to_db()
             if wrong_albums:
                 albums_list = ''
                 for band in wrong_albums:
@@ -572,6 +572,8 @@ class GUI:
                 self.InfoWindow(self._window_root, message)
         except:
             config.logger.exception("Exception when getting album collection")
+        else:
+            return albums_from_server
 
     # --------------------------- UPDATE REVIEWS ----------------------------------------------#
 
@@ -677,7 +679,6 @@ class GUI:
                 MusicManager.update_album(album_window.album)
                 # remove the selected album so review is not updated again
                 self._selected_album = None
-                # TODO: check why the refresh does not update the last edited album
                 self._refresh_album_list()
         except:
             config.logger.error(f"Could not save album with title {album.title}")
