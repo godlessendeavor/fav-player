@@ -2,6 +2,7 @@ import copy
 import threading
 import time
 import hashlib
+from concurrent.futures.thread import ThreadPoolExecutor
 from os import listdir
 from os.path import basename, dirname, isfile, join
 from functools import partial
@@ -43,6 +44,8 @@ class GUI:
         self._albums_from_server = {}  # preliminary dictionary containing the data from the server, to be processed to _albums_list
         self._details_thread = threading.Thread(target=self._start_count)
         self._stop_details_thread = False
+        # workers pool for parallel threads
+        self._workers_pool = None
         # get the client to access the music_db server
         self._music_db = config.music_db_api
         MusicManager.set_update_song_data_cb(self.update_song_data)
@@ -85,11 +88,17 @@ class GUI:
         # Create the Albums sub menu            
         self._file_sub_menu = Menu(self._menu_bar, tearoff=0)
         self._menu_bar.add_cascade(label="Albums", menu=self._file_sub_menu)
-        album_list_func = partial(self._execute_thread, self._get_album_list_thread, self._show_album_list)
+        album_list_func = partial(self._execute_thread,
+                                  self._get_album_list_thread,
+                                  post_function=self._show_album_list)
         self._file_sub_menu.add_command(label="Open List", command=album_list_func)
-        album_add_to_db_func = partial(self._execute_thread, self._add_albums_to_db_thread, self._show_album_list)
+        album_add_to_db_func = partial(self._execute_thread,
+                                       self._add_albums_to_db_thread,
+                                       post_function=self._show_album_list)
         self._file_sub_menu.add_command(label="Add albums from filesystem to DB", command=album_add_to_db_func)
-        review_add_to_db_func = partial(self._execute_thread, self._add_reviews_to_db_thread, self._show_album_list)
+        review_add_to_db_func = partial(self._execute_thread,
+                                        self._add_reviews_to_db_thread,
+                                        post_function=self._show_album_list)
         self._file_sub_menu.add_command(label="Add reviews from filesystem to DB", command=review_add_to_db_func)
         # Create the Play sub menu            
         self._play_sub_menu = Menu(self._menu_bar, tearoff=0)
@@ -390,24 +399,27 @@ class GUI:
     # ------------------ TASKS EXECUTION -----------------------------------------------------#
     # ------------------ TASKS EXECUTION -----------------------------------------------------#
 
-    def _execute_thread(self, target_thread, post_function=None, *args):
+    def _execute_thread(self, target_thread, post_function=None, *post_function_args):
         """
             Function execute tasks in parallel with the GUI main loop.
             It will start a new thread passed on target_thread and a progressbar to indicate progress
             Progress update is checked in _check_thread
+            @post_function: function to be called after the thread is finished. Generally a GUI update.
+            @post_function_args: arguments for the post function.
+            NOTE: any result of the function thread will be passed as last argument to the post function
         """
-        if self._parallel_thread:
-            if self._parallel_thread.is_alive():
+        if self._workers_pool:
+            if self._workers_pool.running():
                 messagebox.showerror('Error',
                                      "Can't perform more than one task in parallel. "
                                      "Please wait until the current one finishes.")
                 return
 
-        self._parallel_thread = threading.Thread(target=target_thread)
-        self._parallel_thread.daemon = True
         self._progressbar.start()
-        self._parallel_thread.start()
-        self._window_root.after(100, self._check_thread, post_function, *args)
+        executor = ThreadPoolExecutor(max_workers=2)
+        self._workers_pool = executor.submit(target_thread)
+
+        self._window_root.after(100, self._check_thread, post_function, *post_function_args)
 
     def _check_thread(self, post_function, *args):
         """
@@ -415,13 +427,18 @@ class GUI:
             Once the thread is finished it calls the post_function passed by argument with its arguments.
         """
         self._window_root.update()
-        if self._parallel_thread.is_alive():
-            self._window_root.after(100, self._check_thread, post_function, *args)
-        else:
-            self._progressbar.stop()
-            # call the post function once the thread is finished
-            if post_function:
-                post_function(*args)
+        if self._workers_pool:
+            if self._workers_pool.running():
+                self._window_root.after(100, self._check_thread, post_function, *args)
+            else:
+                result = self._workers_pool.result()
+                if result:
+                    args = list(args)
+                    args.append(result)
+                self._progressbar.stop()
+                # call the post function once the thread is finished
+                if post_function:
+                    post_function(*args)
 
     # ----------------- MENU ACTIONS ----------------------------------------------------#
     # ----------------- MENU ACTIONS ----------------------------------------------------#
@@ -502,13 +519,13 @@ class GUI:
 
     # --------------------------- GET THE ALBUM LIST ----------------------------------------------#
 
-    def _show_album_list(self):
+    def _show_album_list(self, album_dict):
+        """Function to be called after the get album list thread
+            @param: album_dict, album dictionary with band as keys and values as a dict of albumes
         """
-            Function to be called after the get album list thread
-        """
-        if self._albums_from_server:
+        if album_dict:
             self._init_albums_window_layout()
-            self._add_to_album_list(self._albums_from_server)
+            self._add_to_album_list(album_dict)
             self.status_bar['text'] = 'Album list ready'
         else:
             messagebox.showerror("Error", "Error getting album collection. Please check logging.")
@@ -519,16 +536,18 @@ class GUI:
         """
         self.status_bar['text'] = 'Getting album list'
         try:
-            self._albums_from_server, _, wrong_albums = MusicManager.get_albums_from_collection()
+            albums_from_server, _, wrong_albums = MusicManager.get_albums_from_collection()
             if wrong_albums:
-                albums_list = []
+                albums_list = ''
                 for band in wrong_albums:
                     for album in wrong_albums[band]:
-                        albums_list.append(f"{album} from {band}")
+                        albums_list += f"\n{album} from {band}"
                 message = f"The following albums are not correct {albums_list}"
                 self.InfoWindow(self._window_root, message)
         except:
             config.logger.exception("Exception when getting album collection")
+        else:
+            return albums_from_server
 
     def _add_albums_to_db_thread(self):
         """
@@ -538,17 +557,17 @@ class GUI:
         try:
             self._albums_from_server, new_albums, wrong_albums = MusicManager.add_new_albums_from_collection_to_db()
             if wrong_albums:
-                albums_list = []
+                albums_list = ''
                 for band in wrong_albums:
                     for album in wrong_albums[band]:
-                        albums_list.append(f"{album} from {band}")
-                message = f"The following albums are not correct {albums_list}"
+                        albums_list += f"\n{album} from {band}"
+                message = f"The following albums are not correct: {albums_list}"
                 self.InfoWindow(self._window_root, message)
             if new_albums:
-                albums_list = []
+                albums_list = ''
                 for band in new_albums:
                     for album in new_albums[band]:
-                        albums_list.append(f"{album} from {band}")
+                        albums_list += f"\n{album} from {band}"
                 message = f"The following albums were added to the database {albums_list}"
                 self.InfoWindow(self._window_root, message)
         except:
@@ -815,7 +834,7 @@ class GUI:
             It will call more favorite songs to play.
         """
         if self._favorites_score:
-            self._execute_thread(self._search_favorites_thread, self._play_music)
+            self._execute_thread(self._search_favorites_thread, post_function=self._play_music)
 
     # -------------------- FUNCTION HELPERS  ------------------------------------##
 
@@ -908,8 +927,7 @@ class GUI:
         """
             Refreshes the album list.
         """
-        self._execute_thread(self._get_album_list_thread)
-        self._add_to_album_list(self._albums_from_server)
+        self._execute_thread(self._get_album_list_thread, post_function=self._add_to_album_list)
         self.status_bar['text'] = 'Album list ready'
 
     def update_song_data(self, song):

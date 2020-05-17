@@ -34,6 +34,8 @@ class MusicManager:
     _set_album_data_cb = None
     _set_song_data_cb = None
     _music_dir_tree = None
+    # this tree will contain the non-validated albums
+    _wrong_albums = {}
 
     @classmethod
     def set_update_song_data_cb(cls, cb):
@@ -144,7 +146,7 @@ class MusicManager:
         except Exception as ex:
             raise ex
         else:
-            files_list = [f for f in os.listdir(reviews_path) if os.path.isfile(os.pah.join(reviews_path, f))]
+            files_list = [f for f in os.listdir(reviews_path) if os.path.isfile(os.path.join(reviews_path, f))]
             for file_name in files_list:
                 full_name = os.path.join(reviews_path, file_name)
                 file_name_wo_ext = os.path.splitext(file_name)[0] # remove file extension
@@ -217,6 +219,12 @@ class MusicManager:
         return res_tree
 
     @classmethod
+    def _add_album_to_tree(cls, tree, band_key, album_key, album):
+        if band_key not in tree:
+            tree[band_key] = {}
+        tree[band_key][album_key] = album
+
+    @classmethod
     def _update_albums_from_collection(cls, add_to_db=False):
         """
             Returns a tree with the albums that are both in the collection and the database.
@@ -225,11 +233,10 @@ class MusicManager:
         # First we get a directory tree with all the folders and files in the music directory tree
         dir_tree = cls._get_music_directory_tree()
         # this will be our directory tree with the validated albums
+        # initialize albums trees
         res_tree = {}
-        # this tree will contain the non-validated ones
-        wrong_albums = {}
-        # and this tree will contain the new added albums to the database
-        new_albums = {}
+        cls._wrong_albums = {}
+        cls._new_albums = {}
         # let's check that the folders match our format Year - Title
         for band, albums in list(dir_tree.items()):
             if albums:
@@ -251,13 +258,10 @@ class MusicManager:
                         res_tree[band_key][album.strip().casefold()] = album_obj
                     # TODO: add a configurable list of exceptions, for now we hardcode 'Misc' as exception
                     elif album != 'Misc':
-                        album_logger.warning(
-                            'Album {album} of {band} is not following the format'.format(album=album, band=band))
+                        album_logger.warning('Album {album} of {band} is not following the format'
+                                             .format(album=album, band=band))
                         album_obj.title = album
-                        # TODO add functions to avoid the code duplicate of adding the wrong albums (also for new_Albums)
-                        if band_key not in wrong_albums:
-                            wrong_albums[band_key] = {}
-                        wrong_albums[band_key][album] = album_obj
+                        cls._add_album_to_tree(cls._wrong_albums, band, album, album_obj)
         # now let's check the database
         albums_list = cls._music_db.api_albums_get_albums()
         if isinstance(albums_list, list):
@@ -271,14 +275,15 @@ class MusicManager:
                     if album_key in res_tree[band_key]:
                         res_tree[band_key][album_key].merge(db_album)
                         res_tree[band_key][album_key].in_db = True
+                        #TODO: remove when refresh thing is solved
+                        if int(db_album.id) > 7091:
+                            config.logger.info(f"Getting album {db_album}")
                     else:
                         # log missing album from collection
                         album_logger.error(f"{db_album.title} from {db_album.year} "
                                            f"from {db_album.band} not found")
                         album_logger.error(f"Albums from that band are {res_tree[band_key].keys()}")
-                        if band_key not in wrong_albums:
-                            wrong_albums[band_key] = {}
-                        wrong_albums[band_key][album_key] = db_album
+                        cls._add_album_to_tree(cls._wrong_albums, band_key, album_key, db_album)
                 else:
                     album_logger.warning(f'Band {db_album.band} not found in collection')
         # processing all missing albums in the database
@@ -290,21 +295,14 @@ class MusicManager:
                         try:
                             res_tree[band_key][album_key].merge(cls.update_album(album))
                             res_tree[band_key][album_key].in_db = True
-                            if band_key not in new_albums:
-                                new_albums[band_key] = {}
-                            new_albums[band_key][album_key] = album
+                            cls._add_album_to_tree(cls._new_albums, band_key, album_key, album)
                         except:
-                            config.logger.exception(
-                                f"Could not add album {album.title} of band {album.band} to the db.")
-                            if band_key not in wrong_albums:
-                                wrong_albums[band_key] = {}
-                            wrong_albums[band_key][album_key] = album
+                            config.logger.exception(f"Could not add album {album.title} of band {album.band} to the db.")
+                            cls._add_album_to_tree(cls._wrong_albums, band_key, album_key, album)
                     else:
                         album_logger.warning(f'Album {album.title} of band {album.band} not found in database')
-                        if band_key not in wrong_albums:
-                            wrong_albums[band_key] = {}
-                        wrong_albums[band_key][album_key] = album
-        return res_tree, new_albums, wrong_albums
+                        cls._add_album_to_tree(cls._wrong_albums, band_key, album_key, album)
+        return res_tree, cls._new_albums, cls._wrong_albums
 
     @classmethod
     def _get_songs_in_fs(cls, song_list):
@@ -316,7 +314,7 @@ class MusicManager:
             config.logger.error(f'song_list is not of list type')
         else:
             # get albums from collection to search for this song list
-            albums_dict = cls.get_albums_from_collection()
+            albums_dict, _, _ = cls._update_albums_from_collection()
             # for every song in the database result search the album info in the database
             for db_song in song_list:
                 # if it's the same band then we continue, otherwise there might be a mistake
@@ -452,7 +450,7 @@ class MusicManager:
                     year = date_parser.parse(date).year
                 except ValueError:
                     config.logger.exception(f"Date {date} could not be parsed")
-                    # TODO: reraise?
+                    raise KeyError(f'Date {date} could not be parsed')
                 album_year_list.append((release["title"], year))
 
             return album_year_list
