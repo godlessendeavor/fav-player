@@ -34,27 +34,26 @@ class MusicManager:
     _set_album_data_cb = None
     _set_song_data_cb = None
     _music_dir_tree = None
+    # this tree will contain the validated albums
+    _valid_albums = {}
     # this tree will contain the non-validated albums
     _wrong_albums = {}
+    # this tree will contain the new albums
+    _new_albums = {}
 
     @classmethod
     def set_update_song_data_cb(cls, cb):
-        """
-            Sets a callback to set the file name from the GUI.
-        """
+        """Sets a callback to set the file name from the GUI."""
         cls._set_song_data_cb = cb
 
     @classmethod
     def set_update_album_data_cb(cls, cb):
-        """
-            Sets a callback to set the album data from the GUI.
-        """
+        """Sets a callback to set the album data from the GUI."""
         cls._set_album_data_cb = cb
 
     @classmethod
     def get_albums_from_collection(cls):
-        """
-            Gets the albums collection from the configured Music Directory
+        """Gets the albums collection from the configured Music Directory
             and compares with the database collection.
             @return tuple containing:
             1) the dict of validated albums from collection
@@ -76,9 +75,7 @@ class MusicManager:
 
     @classmethod
     def update_album(cls, album):
-        """
-            Function to update an album in the server.
-        """
+        """Function to update an album in the server."""
         if album.validate():
             try:
                 album = cls._music_db.api_albums_update_album(album)
@@ -89,7 +86,19 @@ class MusicManager:
                 config.logger.debug(f"Album {album.title} saved to the database")
                 return album
         else:
-            config.logger(f"Some problem with validation of album {album.title}")
+            config.logger.error(f"Some problem with validation of album {album.title}")
+
+    @classmethod
+    def delete_album(cls, album):
+        """Function to delete an album from the server."""
+        try:
+            cls._music_db.api_albums_delete_album(album.id)
+        except Exception as ex:
+            config.logger.exception(f'Could not delete album with title {album.title}')
+            raise ex
+        else:
+            config.logger.debug(f"Album {album.title} deleted from the database")
+            return album
 
     @classmethod
     def get_favorites(cls, quantity, score):
@@ -137,63 +146,70 @@ class MusicManager:
 
     @classmethod
     def add_reviews_batch(cls, reviews_path):
+        """Gets reviews from text files and sets them in the corresponding albums.
+        Arguments:
+            reviews_path(str): the reviews path where to get the text files with the reviews to add
+        Returns:
+            dict with the updated collection of albums
         """
-            Gets reviews from text files and sets them in the corresponding albums.
-            :param reviews_path
-        """
-        try:
-            res_tree = cls._get_music_directory_tree()
-        except Exception as ex:
-            raise ex
-        else:
-            files_list = [f for f in os.listdir(reviews_path) if os.path.isfile(os.path.join(reviews_path, f))]
-            for file_name in files_list:
-                full_name = os.path.join(reviews_path, file_name)
-                file_name_wo_ext = os.path.splitext(file_name)[0] # remove file extension
-                # get the info from the file name
-                # the pattern is BAND - ALBUM - SCORE
-                keys = file_name_wo_ext.split('-')
-                if len(keys) != 3:
-                    config.logger.error(f'The file {file_name} does not follow the pattern BAND - ALBUM - SCORE')
-                else:
-                    band_key = keys[0].casefold()
-                    album_key = keys[1].casefold()
-                    score = keys[2]
-                    found_album = False
-                    if band_key in res_tree:
-                        for key, album_obj in res_tree[band_key].items():
-                            if album_obj.title.casefold() == album_key:
-                                found_album = True
-                                # set the score
-                                album_obj.score = score
+        if not cls._valid_albums:
+            cls._update_albums_from_collection()
+        files_list = [f for f in os.listdir(reviews_path) if os.path.isfile(os.path.join(reviews_path, f))]
+        if not files_list:
+            raise FileNotFoundError
+        for file_name in files_list:
+            full_name = os.path.join(reviews_path, file_name)
+            file_name_wo_ext = os.path.splitext(file_name)[0] # remove file extension
+            # get the info from the file name
+            # the pattern is BAND - ALBUM - SCORE
+            keys = file_name_wo_ext.split('-')
+            if len(keys) != 3:
+                config.logger.error(f'The file {file_name} does not follow the pattern BAND - ALBUM - SCORE')
+            else:
+                band_key = keys[0].casefold().strip()
+                album_key = keys[1].casefold().strip()
+                score = keys[2].strip()
+                found_album = False
+                if band_key in cls._valid_albums:
+                    for key, album_obj in cls._valid_albums[band_key].items():
+                        if album_obj.title.casefold() == album_key:
+                            found_album = True
+                            # set the score
+                            album_obj.score = score
+                            try:
+                                with open(full_name) as f:
+                                    review = f.read()
+                            except:
+                                config.logger.exception(f'Could not open file {full_name}')
+                            else:
+                                album_obj.review = review
                                 try:
-                                    with open(full_name) as f:
-                                        review = f.read()
+                                    cls._valid_albums[band_key][key].merge(cls.update_album(album_obj))
+                                    cls._valid_albums[band_key][key].in_db = True
                                 except:
-                                    config.logger.exception(f'Could not open file {full_name}')
+                                    config.logger.exception(f'Could not update review for album {album_key} '
+                                                        f'for band {band_key}')
+                                    cls._add_album_to_tree(cls._wrong_albums, band_key, album_key, album_obj)
                                 else:
-                                    album_obj.review = review
                                     try:
-                                        res_tree[band_key][key].merge(cls.update_album(album_obj))
-                                        res_tree[band_key][key].in_db = True
-                                    except:
-                                        config.logger.error(f'Could not update review for album {album_key} '
-                                                            f'for band {band_key}')
-                                    else:
                                         # move the review file out
-                                        os.rename(full_name, os.path.join('/tmp', file_name))
-                                break
-                        if not found_album:
-                            config.logger.error(f'Could not find the album {album_key} for band {band_key} '
-                                                f'in the music directory.')
-                    else:
-                        config.logger.error(f'Could not find the band {band_key} in the music directory.')
-            return res_tree
+                                        os.rename(full_name, os.path.join(reviews_path, 'DONE - ' + file_name))
+                                    except:
+                                        config.logger.exception(f'Could not move file {file_name} to tmp')
+                            break
+                    if not found_album:
+                        config.logger.error(f'Could not find the album {album_key} for band {band_key} '
+                                            f'in the music directory.')
+                else:
+                    config.logger.error(f'Could not find the band {band_key} in the music directory.')
+                    cls._add_album_to_tree(cls._wrong_albums, band_key, album_key, None)
+        return cls._valid_albums, cls._wrong_albums
 
     @classmethod
     def _get_music_directory_tree(cls):
-        """
-            Function that returns a nested dictionary with all files in the Music folder
+        """Function to get all files in the Music folder
+        Returns:
+            dict, nested with all files in the Music folder
         """
         if cls._music_dir_tree:
             res_tree = cls._music_dir_tree
@@ -220,21 +236,27 @@ class MusicManager:
 
     @classmethod
     def _add_album_to_tree(cls, tree, band_key, album_key, album):
+        """Adds an album to a tree.
+        Arguments:
+            tree(dict): the tree of albums to be added to
+            band_key(str): the band key in the tree (if it doesn't exist it will create it)
+            album_key(str): the album key in the band
+            album(Album): the album object
+        """
         if band_key not in tree:
             tree[band_key] = {}
         tree[band_key][album_key] = album
 
     @classmethod
     def _update_albums_from_collection(cls, add_to_db=False):
-        """
-            Returns a tree with the albums that are both in the collection and the database.
+        """Returns a tree with the albums that are both in the collection and the database.
             @param: add_to_db, indicates if the albums that are not in the database should be added.
         """
         # First we get a directory tree with all the folders and files in the music directory tree
         dir_tree = cls._get_music_directory_tree()
         # this will be our directory tree with the validated albums
         # initialize albums trees
-        res_tree = {}
+        cls._valid_albums = {}
         cls._wrong_albums = {}
         cls._new_albums = {}
         # let's check that the folders match our format Year - Title
@@ -253,9 +275,9 @@ class MusicManager:
                         album_obj.year = album_split[0].strip()
                         album_obj.title = album_split[1].strip()
                         album_obj.path = os.path.join(cls._collection_root, band, album)
-                        if band_key not in res_tree:
-                            res_tree[band_key] = {}
-                        res_tree[band_key][album.strip().casefold()] = album_obj
+                        if band_key not in cls._valid_albums:
+                            cls._valid_albums[band_key] = {}
+                        cls._valid_albums[band_key][album.strip().casefold()] = album_obj
                     # TODO: add a configurable list of exceptions, for now we hardcode 'Misc' as exception
                     elif album != 'Misc':
                         album_logger.warning('Album {album} of {band} is not following the format'
@@ -267,31 +289,31 @@ class MusicManager:
         if isinstance(albums_list, list):
             for db_album in albums_list:
                 band_key = db_album.band.casefold().strip()
-                if band_key in res_tree:
+                if band_key in cls._valid_albums:
                     # TODO: look for an alternative solution for the albums with no year
                     if db_album.year == '0':
                         db_album.year = '0000'
                     album_key = f'{db_album.year} - {db_album.title}'.strip().casefold()
-                    if album_key in res_tree[band_key]:
-                        res_tree[band_key][album_key].merge(db_album)
-                        res_tree[band_key][album_key].in_db = True
+                    if album_key in cls._valid_albums[band_key]:
+                        cls._valid_albums[band_key][album_key].merge(db_album)
+                        cls._valid_albums[band_key][album_key].in_db = True
                     else:
                         # log missing album from collection
                         album_logger.error(f"{db_album.title} from {db_album.year} "
                                            f"from {db_album.band} not found")
-                        album_logger.error(f"Albums from that band are {res_tree[band_key].keys()}")
+                        album_logger.error(f"Albums from that band are {cls._valid_albums[band_key].keys()}")
                         cls._add_album_to_tree(cls._wrong_albums, band_key, album_key, db_album)
                 else:
                     album_logger.warning(f'Band {db_album.band} not found in collection')
         # processing all missing albums in the database
-        for band_key, album_dict in res_tree.items():
+        for band_key, album_dict in cls._valid_albums.items():
             for album_key, album in album_dict.items():
                 if not album.in_db:
                     if add_to_db:
                         # if we need to add to the database we call the server with this info
                         try:
-                            res_tree[band_key][album_key].merge(cls.update_album(album))
-                            res_tree[band_key][album_key].in_db = True
+                            cls._valid_albums[band_key][album_key].merge(cls.update_album(album))
+                            cls._valid_albums[band_key][album_key].in_db = True
                             cls._add_album_to_tree(cls._new_albums, band_key, album_key, album)
                         except:
                             config.logger.exception(f"Could not add album {album.title} of band {album.band} to the db.")
@@ -299,12 +321,13 @@ class MusicManager:
                     else:
                         album_logger.warning(f'Album {album.title} of band {album.band} not found in database')
                         cls._add_album_to_tree(cls._wrong_albums, band_key, album_key, album)
-        return res_tree, cls._new_albums, cls._wrong_albums
+        return cls._valid_albums, cls._new_albums, cls._wrong_albums
 
     @classmethod
     def _get_songs_in_fs(cls, song_list):
-        """
-            Returns the songs (of Song type) from the given list that exist on the File System.
+        """Gets songs from the given list that exist on the File System.
+        Returns:
+            [Song]
         """
         fav_songs = []
         if not isinstance(song_list, list):
@@ -359,12 +382,13 @@ class MusicManager:
 
     @classmethod
     def _search_and_update_song_file_name(cls, song):
-        """
-            Helper to add the file_name attribute to a song when it's empty.
+        """Helper to add the file_name attribute to a song when it's empty.
             It will check if there is a music file within the album folder which name contains the title of the song.
             If it's found the file_name attribute will be updated.
-            @param: song
-            @return: boolean indicating if song was found or not.
+        Arguments:
+            song(Song)
+        Returns:
+            boolean indicating if song was found or not.
         """
         found_song = False
         for folder, dirs, files in os.walk(song.album.path):

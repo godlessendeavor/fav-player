@@ -309,9 +309,7 @@ class GUI:
                 self._album_list_popup.unpost()
 
             def do_album_list_play_album():
-                """
-                    Plays selected album on popup
-                """
+                """Plays selected album on popup"""
                 row = self._album_list_popup.selection
                 try:
                     album = self._albums_list[row]
@@ -325,13 +323,19 @@ class GUI:
                     self._play_music()
 
             def do_album_edit():
-                """
-                    Edits the selected album
-                """
+                """Edits the selected album"""
                 try:
                     self._edit_album(self._albums_list[self._album_list_popup.selection])
                 except KeyError:
-                    # not an album but a band key, do not play
+                    # not an album but a band key, do not edit
+                    pass
+
+            def do_album_delete():
+                """Deletes the selected album"""
+                try:
+                    self._delete_album(self._albums_list[self._album_list_popup.selection])
+                except KeyError:
+                    # not an album but a band key, do nothing.
                     pass
 
             def do_album_selection(event):
@@ -376,8 +380,9 @@ class GUI:
                     self._album_work_art_canvas.create_image(20, 20, anchor=NW, image=self._current_album_img)
 
             self._album_list_popup = Menu(self._albums_window, tearoff=0)
-            self._album_list_popup.add_command(label="Play this album", command=do_album_list_play_album)
-            self._album_list_popup.add_command(label="Edit this album", command=do_album_edit)
+            self._album_list_popup.add_command(label="Play album", command=do_album_list_play_album)
+            self._album_list_popup.add_command(label="Edit album", command=do_album_edit)
+            self._album_list_popup.add_command(label="Delete album", command=do_album_delete)
 
             # add popup to album_list tree view
             self._album_listbox.bind("<Button-3>", do_album_list_popup)
@@ -586,9 +591,17 @@ class GUI:
                                               title=f"Choose reviews path")
         if reviews_dir:
             try:
-                self._albums_from_server = MusicManager.add_reviews_batch(reviews_dir)
+                album_list, wrong_album_list  = MusicManager.add_reviews_batch(reviews_dir)
+                if wrong_album_list:
+                    albums_list = ''
+                    for band in wrong_album_list:
+                        for album in wrong_album_list[band]:
+                            albums_list += f"\n{album} from {band}"
+                    message = f"The following reviews could not be updated in the database {albums_list}"
+                    self.InfoWindow(self._window_root, message)
             except:
                 config.logger.exception("Exception when updating reviews to album collection")
+                messagebox.showerror("Error", "Error adding reviews to db. Please check logging.")
 
     # --------------- POP UP ACTIONS -----------------------------------------------------------#
 
@@ -606,14 +619,13 @@ class GUI:
             try:
                 MusicManager.add_song_to_favorites(song)
             except Exception:
+                config.logger.exception(f'Error adding new favorite song.')
                 messagebox.showerror("Error", "Error adding a new favorite song. Please check logging.")
 
     # ----------------------- BUTTONS ACTIONS -------------------------------------------#
 
     class AlbumEditWindow(object):
-        """
-            Window for editing album fields.
-        """
+        """ Window for editing album fields."""
 
         def __init__(self, master, album):
             top = self.top = Toplevel(master)
@@ -665,8 +677,7 @@ class GUI:
             self.top.destroy()
 
     def _edit_album(self, album):
-        """
-            Edits an album interactively.
+        """Edits an album interactively.
             It will open a window to edit the different fields for the given album.
             After the album is saved the albums_window will be refreshed.
             @param: album, the album to edit
@@ -681,8 +692,44 @@ class GUI:
                 self._selected_album = None
                 self._refresh_album_list()
         except:
-            config.logger.error(f"Could not save album with title {album.title}")
+            config.logger.exception(f"Could not save album with title {album.title}")
             messagebox.showerror('Editor error', f"Could not save album with title {album.title}")
+
+    class DeleteQuestionWindow(object):
+        """ Window for editing album fields."""
+
+        def __init__(self, master, album):
+            top = self.top = Toplevel(master)
+            self.delete = False
+            desc_label = Label(top, text=f'Are you sure you want to delete album with title "{album.title}" of band "{album.band}"')
+            desc_label.grid(row=0, column=1)
+            button = Button(top, text='Yes', command=self.do_delete)
+            button.grid(row=1, column=1)
+            button = Button(top, text='No', command=self.quit)
+            button.grid(row=1, column=2)
+
+        def do_delete(self):
+            self.delete = True
+            self.top.destroy()
+
+        def quit(self):
+            self.top.destroy()
+
+    def _delete_album(self, album):
+        """Deletes an album.
+            @param: album, the album to edit
+        """
+        delete_question_window = self.DeleteQuestionWindow(self._window_root, album)
+        self._window_root.wait_window(delete_question_window.top)
+        if delete_question_window.delete:
+            try:
+                MusicManager.delete_album(album)
+                # remove the selected album so review is not updated again
+                self._selected_album = None
+                self._refresh_album_list()
+            except:
+                config.logger.exception(f"Could not delete album with title {album.title}")
+                messagebox.showerror('Editor error', f"Could not delete album with title {album.title}")
 
     def _delete_song(self):
         """
