@@ -436,14 +436,18 @@ class GUI:
             if self._workers_pool.running():
                 self._window_root.after(100, self._check_thread, post_function, *args)
             else:
-                result = self._workers_pool.result()
-                if result:
-                    args = list(args)
-                    args.append(result)
-                self._progressbar.stop()
-                # call the post function once the thread is finished
-                if post_function:
-                    post_function(*args)
+                try:
+                    result = self._workers_pool.result()
+                except:
+                    config.logger.exception(f'The execution of thread failed.')
+                else:
+                    if result:
+                        args = list(args)
+                        args.append(result)
+                    self._progressbar.stop()
+                    # call the post function once the thread is finished
+                    if post_function:
+                        post_function(*args)
 
     # ----------------- MENU ACTIONS ----------------------------------------------------#
     # ----------------- MENU ACTIONS ----------------------------------------------------#
