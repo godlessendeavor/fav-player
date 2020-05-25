@@ -102,12 +102,11 @@ class MusicManager:
 
     @classmethod
     def get_favorites(cls, quantity, score):
+        """Gets a list with random songs from the favorites list that complies with the required score.
+        Arguments:
+            quantity(int): the number of songs to return
+            score(float): the minimum score of the song
         """
-            Gets a list with random songs from the favorites list that complies with the required score.
-            :param quantity, the number of songs to return
-            :param score, the minimum score of the song
-        """
-        fav_songs = []
         # get a list from the database with the favorite songs
         try:
             if quantity:
@@ -137,12 +136,13 @@ class MusicManager:
                     config.logger.error(f'Song needs an album with an id.')
                     raise Exception
             try:
-                song = cls._musicdb.api_songs_update_song(song)
+                song = cls._music_db.api_songs_update_song(song)
             except ApiException as ex:
                 config.logger.exception(f'Error adding a new favorite song to server.')
                 raise ex
         else:
             config.logger.error(f'Song is not of Song type')
+        return song
 
     @classmethod
     def add_reviews_batch(cls, reviews_path):
@@ -162,12 +162,12 @@ class MusicManager:
             file_name_wo_ext = os.path.splitext(file_name)[0] # remove file extension
             # get the info from the file name
             # the pattern is BAND - ALBUM - SCORE
-            # TODO - Allow dash in album
+            # Album name can contain dashes
             first_split = file_name_wo_ext.split('-', 1)
             band_key = first_split[0].casefold().strip()
             second_split = first_split[1].rsplit('-', 1)
             album_key = second_split[0].casefold().strip()
-            score = second_split[0].strip()
+            score = second_split[1].strip()
             found_album = False
             if band_key in cls._valid_albums:
                 for key, album_obj in cls._valid_albums[band_key].items():
@@ -199,9 +199,10 @@ class MusicManager:
                 if not found_album:
                     config.logger.error(f'Could not find the album {album_key} for band {band_key} '
                                         f'in the music directory.')
+                    cls._add_album_to_tree(cls._wrong_albums, band_key, album_key)
             else:
                 config.logger.error(f'Could not find the band {band_key} in the music directory.')
-                cls._add_album_to_tree(cls._wrong_albums, band_key, album_key, None)
+                cls._add_album_to_tree(cls._wrong_albums, band_key, album_key)
         return cls._valid_albums, cls._wrong_albums
 
     @classmethod
@@ -234,7 +235,7 @@ class MusicManager:
         return res_tree
 
     @classmethod
-    def _add_album_to_tree(cls, tree, band_key, album_key, album):
+    def _add_album_to_tree(cls, tree, band_key, album_key, album=None):
         """Adds an album to a tree.
         Arguments:
             tree(dict): the tree of albums to be added to

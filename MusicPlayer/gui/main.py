@@ -553,8 +553,9 @@ class GUI:
                         albums_list += f"\n{album} from {band}"
                 message = f"The following albums are not correct {albums_list}"
                 self.InfoWindow(self._window_root, message)
-        except:
+        except Exception as ex:
             config.logger.exception("Exception when getting album collection")
+            raise ex
         else:
             return albums_from_server
 
@@ -579,8 +580,10 @@ class GUI:
                         albums_list += f"\n{album} from {band}"
                 message = f"The following albums were added to the database {albums_list}"
                 self.InfoWindow(self._window_root, message)
-        except:
-            config.logger.exception("Exception when getting album collection")
+        except Exception as ex:
+            config.logger.exception("Exception getting album collection")
+            messagebox.showerror("Error", "Error getting album collection. Please check logging.")
+            raise ex
         else:
             return albums_from_server
 
@@ -603,9 +606,10 @@ class GUI:
                             albums_list += f"\n{album} from {band}"
                     message = f"The following reviews could not be updated in the database {albums_list}"
                     self.InfoWindow(self._window_root, message)
-            except:
-                config.logger.exception("Exception when updating reviews to album collection")
-                messagebox.showerror("Error", "Error adding reviews to db. Please check logging.")
+            except Exception as ex:
+                config.logger.exception("Exception updating reviews to album collection")
+                messagebox.showerror("Error", "Error updating reviews to db. Please check logging.")
+                raise ex
 
     # --------------- POP UP ACTIONS -----------------------------------------------------------#
 
