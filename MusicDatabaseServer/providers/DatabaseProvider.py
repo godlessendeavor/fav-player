@@ -115,7 +115,7 @@ class DatabaseProvider(object):
                 .where(Favorites.score > score) \
                 .order_by(fn.Rand()).limit(int(quantity))
         else:
-            result = Favorites.select(Favorites).where()
+            result = Favorites.select()
         # No, I will not do a JOIN. Some column names are the same in both tables (title for example)
         # The simple Join query on Peewee will override those names
         # That means that every column with shared name has to be given an alias and then map back to the
@@ -133,7 +133,6 @@ class DatabaseProvider(object):
             fav = Favorites()
             # first copy compulsory fields and validate types
             try:
-                fav.track_number = int(song['track_number'])
                 fav.title = song['title']
                 fav.score = float(song['score'])
                 fav.album_id = int(song['album']['id'])
@@ -146,6 +145,7 @@ class DatabaseProvider(object):
                 return song, 400
             # now copy optional fields
             try:
+                fav.track_number = int(song['track_number'])
                 fav.type = song['type']
             except KeyError:
                 logger.warning('Type of song was not provided for song: ', song)
@@ -155,7 +155,7 @@ class DatabaseProvider(object):
             except KeyError:
                 # Id was not provided search song by title and album_id, perhaps it already exists
                 result = self._search_song_by_title_and_album_id(fav.title, fav.album_id)
-                if result[0]:
+                if result and result[0]:
                     try:
                         fav.id = result[0]['id']
                     except KeyError:
