@@ -69,6 +69,41 @@ class Song(DB_song):
         except:
             config.logger.exception(f'Could not set absolute path for song in {path}')
 
+    def validate(self):
+        """Validates the attributes of this instance.
+        Returns:
+            bool: True if it's a valid song. False if not.
+        """
+        if not self._album:
+            config.logger.error(f"Album of song is empty")
+            return False
+        if not self._title:
+            config.logger.error(f"Title of song is empty")
+            return False
+        if not self._album:
+            config.logger.error(f"Album of song is empty")
+            return False
+        elif not isinstance(self._album, Album):
+            config.logger.error(f"Album of song is not the right type. Expecting type {type(Album)} got {type(self._album)}")
+            return False
+        if self._track_number and not self._score.isspace():
+            try:
+                track_number = int(self._track_number)
+            except:
+                config.logger.error(f"Track number of song is not an integer")
+                return False
+        if self._score and not self._score.isspace():
+            try:
+                score = float(self._score)
+            except:
+                config.logger.error(f"Score of song is not a Float")
+                return False
+            else:
+                if score < 0.0 or score > 10.0:
+                    config.logger.error(f"Score of song is not correct {self._score}")
+                    return False
+        return True
+
     def update_song_data_from_file(self, song_path):
         """
             Updates the abs path of a song from a given path and it reads the MP3 data.

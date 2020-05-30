@@ -100,7 +100,12 @@ class GUI:
                                         self._add_reviews_to_db_thread,
                                         post_function=self._show_album_list)
         self._file_sub_menu.add_command(label="Add reviews from filesystem to DB", command=review_add_to_db_func)
-        # Create the Play sub menu            
+        add_songs_from_reviews_func = partial(self._execute_thread,
+                                              self._add_songs_from_reviews_thread,
+                                              post_function=None)
+        self._file_sub_menu.add_command(label="Add songs from reviews", command=add_songs_from_reviews_func)
+
+        # Create the Play sub menu
         self._play_sub_menu = Menu(self._menu_bar, tearoff=0)
         self._menu_bar.add_cascade(label="Play", menu=self._play_sub_menu)
         self._play_sub_menu.add_command(label="Favorites random", command=self._play_favorites)
@@ -590,15 +595,13 @@ class GUI:
     # --------------------------- UPDATE REVIEWS ----------------------------------------------#
 
     def _add_reviews_to_db_thread(self):
-        """
-            Thread to add reviews from the filesystem to the database.
-        """
+        """Thread to add reviews from the filesystem to the database."""
         self.status_bar['text'] = 'Adding reviews to database'
         reviews_dir = filedialog.askdirectory(initialdir=config.MUSIC_PATH, parent=self._window_root,
                                               title=f"Choose reviews path")
         if reviews_dir:
             try:
-                album_list, wrong_album_list  = MusicManager.add_reviews_batch(reviews_dir)
+                album_list, wrong_album_list = MusicManager.add_reviews_batch(reviews_dir)
                 if wrong_album_list:
                     albums_list = ''
                     for band in wrong_album_list:
@@ -610,6 +613,17 @@ class GUI:
                 config.logger.exception("Exception updating reviews to album collection")
                 messagebox.showerror("Error", "Error updating reviews to db. Please check logging.")
                 raise ex
+
+    # --------------------------- UPDATE FAVORITE SONGS FROM REVIEWS  ----------------------------------------------#
+    def _add_songs_from_reviews_thread(self):
+        """Thread to add songs from reviews"""
+        self.status_bar['text'] = 'Adding favorite songs from reviews to database'
+        try:
+            MusicManager.add_songs_from_reviews()
+        except Exception as ex:
+            config.logger.exception("Exception adding favorite songs from reviews to the db")
+            messagebox.showerror("Error", "Error adding favorite songs from reviews db. Please check logging.")
+            raise ex
 
     # --------------- POP UP ACTIONS -----------------------------------------------------------#
 
@@ -643,7 +657,7 @@ class GUI:
             style_label.grid(row=1, column=0)
             self.style_entry = Entry(top)
             self.style_entry.grid(row=1, column=1)
-            self.style_entry.insert(END, str(album.style) if album.style  else '')
+            self.style_entry.insert(END, str(album.style) if album.style else '')
             year_label = Label(top, text="Year")
             year_label.grid(row=2, column=0)
             self.year_entry = Entry(top)
@@ -687,8 +701,10 @@ class GUI:
     def _edit_album(self, album):
         """Edits an album interactively.
             It will open a window to edit the different fields for the given album.
+            If user clicks save the album will be updated by calling the MusicManager.
             After the album is saved the albums_window will be refreshed.
-            @param: album, the album to edit
+        Arguments:
+            album(Album): the album to edit
         """
         old_album = copy.deepcopy(album)
         album_window = self.AlbumEditWindow(self._window_root, album)
@@ -703,13 +719,81 @@ class GUI:
             config.logger.exception(f"Could not save album with title {album.title}")
             messagebox.showerror('Editor error', f"Could not save album with title {album.title}")
 
+    class SongEditWindow(object):
+        """ Window for editing song fields."""
+
+        def __init__(self, master, song):
+            top = self.top = Toplevel(master)
+            desc_label = Label(top, text=f'Editing song with title "{song.title}" of album "{song.album.title}" '
+                                         f'from band {song.album.band}')
+            desc_label.grid(row=0, column=1)
+            title_label = Label(top, text="Title")
+            title_label.grid(row=1, column=0)
+            self.title_entry = Entry(top)
+            self.title_entry.grid(row=1, column=1)
+            self.title_entry.insert(END, str(song.title) if song.title else '')
+            score_label = Label(top, text="Score")
+            score_label.grid(row=2, column=0)
+            self.score_entry = Entry(top)
+            self.score_entry.grid(row=2, column=1)
+            self.score_entry.insert(END, str(song.score) if song.score else '')
+            file_name_label = Label(top, text="File name")
+            file_name_label.grid(row=3, column=0)
+            file_name_value_label = Label(top, text=song.file_name)
+            file_name_value_label.grid(row=3, column=1)
+            button = Button(top, text='Save', command=self.save)
+            button.grid(row=4, column=0)
+            button = Button(top, text='Choose path', command=self.choose_path)
+            button.grid(row=4, column=1)
+            button = Button(top, text='Cancel', command=self.cancel)
+            button.grid(row=4, column=2)
+            # TODO: add a button to update album if review was not correct
+            self.song = song
+
+        def save(self):
+            self.song.title = self.title_entry.get().strip()
+            self.song.score = self.score_entry.get().strip()
+            self.top.destroy()
+
+        def cancel(self):
+            self.top.destroy()
+
+        def choose_path(self):
+            file_name = filedialog.askopenfilenames(initialdir=config.MUSIC_PATH, parent=self.top,
+                                                    title=f"Choose file for song {self.song.title} "
+                                                          f"from album title {self.song.album.title} "
+                                                          f"and band {self.song.album.band}")
+            if file_name:
+                self.song.file_name = file_name[0]
+                return self.song
+            else:
+                return None
+
+    def _edit_song(self, song):
+        """Edits a song interactively.
+        It will open a window to edit the different fields of the given song.
+        If user presses save the song will be updated by calling the MusicManager.
+        Arguments:
+            song(Song): the song to update
+        """
+        old_song = copy.deepcopy(song)
+        song_window = self.SongEditWindow(self._window_root, song)
+        self._window_root.wait_window(song_window.top)
+        try:
+            if old_song != song_window.song:
+                MusicManager.update_song(song_window.song)
+        except:
+            config.logger.exception(f"Could not save song with title {song.title}")
+            messagebox.showerror('Editor error', f"Could not save song with title {song.title}")
+
     class DeleteQuestionWindow(object):
         """ Window for editing album fields."""
 
         def __init__(self, master, album):
             top = self.top = Toplevel(master)
             self.delete = False
-            desc_label = Label(top, text=f'Are you sure you want to delete album with title "{album.title}" of band "{album.band}"')
+            desc_label = Label(top,
+                               text=f'Are you sure you want to delete album with title "{album.title}" of band "{album.band}"')
             desc_label.grid(row=0, column=1)
             button = Button(top, text='Yes', command=self.do_delete)
             button.grid(row=1, column=1)
@@ -987,24 +1071,17 @@ class GUI:
         self.status_bar['text'] = 'Album list ready'
 
     def update_song_data(self, song):
+        """Callback function to update interactively song data.
+        Arguments:
+            song(Song): the song to update
         """
-            Callback function to update interactively song data.
-            We only ask for file name.
-        """
-        file_name = filedialog.askopenfilenames(initialdir=config.MUSIC_PATH, parent=self._window_root,
-                                                title=f"Choose file for song {song.title} "
-                                                      f"from album title {song.album.title} "
-                                                      f"and band {song.album.band}")
-        if file_name:
-            return file_name[0]
-        else:
-            return None
+        self._edit_song(song)
 
     def update_album_data(self, album):
+        """Callback function to update interactively album data.
+        Arguments:
+            album(Album): the album to update
         """
-            Callback function to update interactively album data.
-        """
-        # TODO: check this
         self._edit_album(album)
 
     def _show_details(self):
