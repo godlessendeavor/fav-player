@@ -532,8 +532,8 @@ class MusicManager:
             # getting diff path
             diff_path = os.path.relpath(song.file_name, song.album.path)
             config.logger.info(f"Setting file name from {song.file_name} to {diff_path}")
-            song.file_name = diff_path
             song.abs_path = song.file_name
+            song.file_name = diff_path
             found_song = True
         return found_song
 

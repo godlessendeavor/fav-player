@@ -45,7 +45,7 @@ class GUI:
         self._details_thread = threading.Thread(target=self._start_count)
         self._stop_details_thread = False
         # workers pool for parallel threads
-        self._workers_pool = None
+        self._future = None
         # get the client to access the music_db server
         self._music_db = config.music_db_api
         MusicManager.set_update_song_data_cb(self.update_song_data)
@@ -418,8 +418,8 @@ class GUI:
             @post_function_args: arguments for the post function.
             NOTE: any result of the function thread will be passed as last argument to the post function
         """
-        if self._workers_pool:
-            if self._workers_pool.running():
+        if self._future:
+            if self._future.running():
                 messagebox.showerror('Error',
                                      "Can't perform more than one task in parallel. "
                                      "Please wait until the current one finishes.")
@@ -427,25 +427,26 @@ class GUI:
 
         self._progressbar.start()
         executor = ThreadPoolExecutor(max_workers=2)
-        self._workers_pool = executor.submit(target_thread)
+        self._future = executor.submit(target_thread)
 
         self._window_root.after(100, self._check_thread, post_function, *post_function_args)
 
     def _check_thread(self, post_function, *args):
-        """
-            Function to check progress of a thread. It updates a progress bar while working.
+        """Function to check progress of a thread. It updates a progress bar while working.
             Once the thread is finished it calls the post_function passed by argument with its arguments.
+            It will also add the result from the thread call to these arguments.
         """
         self._window_root.update()
-        if self._workers_pool:
-            if self._workers_pool.running():
-                self._window_root.after(100, self._check_thread, post_function, *args)
+        if self._future:
+            if self._future.running():
+                self._window_root.after(1000, self._check_thread, post_function, *args)
             else:
                 try:
-                    result = self._workers_pool.result()
+                    result = self._future.result()
                 except:
                     config.logger.exception(f'The execution of thread failed.')
                 else:
+                    # append the result from the thread to the post_function arguments
                     if result:
                         args = list(args)
                         args.append(result)
@@ -488,6 +489,12 @@ class GUI:
             self.top.destroy()
 
     def _get_score_input(self, message):
+        """Function helper to open a window to ask the user for giving the score to an album or a song.
+        Arguments:
+            message(str): the message to show in the window, related to the item to give a score for.
+        Returns:
+            the score given from the user
+        """
         question_window = self.FavoritesScoreWindow(self._window_root, message)
         self._window_root.wait_window(question_window.top)
         score = None
@@ -504,17 +511,13 @@ class GUI:
         return score
 
     def _play_favorites(self):
-        """
-            Function to play the favorite songs
-        """
+        """Function to play the favorite songs"""
         self._favorites_score = self._get_score_input("Please give the minimum score of songs to play")
         if self._favorites_score:
             self._execute_thread(self._search_favorites_thread, self._play_music)
 
     def _search_favorites_thread(self):
-        """
-            Thread to search favorite songs and add to the playlist
-        """
+        """Thread to search favorite songs and add to the playlist"""
         self.status_bar['text'] = 'Getting favorite songs'
         try:
             quantity = 10
@@ -545,9 +548,7 @@ class GUI:
             messagebox.showerror("Error", "Error getting album collection. Please check logging.")
 
     def _get_album_list_thread(self):
-        """
-            Thread to get the album list.
-        """
+        """Thread to get the album list from the collection and database."""
         self.status_bar['text'] = 'Getting album list'
         try:
             albums_from_server, _, wrong_albums = MusicManager.get_albums_from_collection()
@@ -565,9 +566,7 @@ class GUI:
             return albums_from_server
 
     def _add_albums_to_db_thread(self):
-        """
-            Thread to add albums from the filesystem to the database.
-        """
+        """Thread to add all albums from the filesystem that don't exist in the database to the database."""
         self.status_bar['text'] = 'Adding albums to database'
         try:
             albums_from_server, new_albums, wrong_albums = MusicManager.add_new_albums_from_collection_to_db()
@@ -630,9 +629,7 @@ class GUI:
     # --------------- MAIN PLAYER ---------------#
 
     def _playlist_box_add_to_favorites(self):
-        """
-            Adds the selected song from the playlist to the favorites in the server.
-        """
+        """ Adds the selected song from the playlist to the favorites in the server."""
         song = self._playlist[self._playlist_popup.selection]
         score = self._get_score_input(f"Give the score for the current song {song.title}"
                                       f" with current score {song.score}")
@@ -698,13 +695,14 @@ class GUI:
             self.album.review = self._review_text_box_album.get(1.0, END)[:-1]
             self.top.destroy()
 
-    def _edit_album(self, album):
+    def _edit_album(self, album, do_refresh=True):
         """Edits an album interactively.
             It will open a window to edit the different fields for the given album.
             If user clicks save the album will be updated by calling the MusicManager.
             After the album is saved the albums_window will be refreshed.
         Arguments:
             album(Album): the album to edit
+            do_refresh(bool): indicates if the album list should be refreshed
         """
         old_album = copy.deepcopy(album)
         album_window = self.AlbumEditWindow(self._window_root, album)
@@ -714,7 +712,8 @@ class GUI:
                 MusicManager.update_album(album_window.album)
                 # remove the selected album so review is not updated again
                 self._selected_album = None
-                self._refresh_album_list()
+                if do_refresh:
+                    self._refresh_album_list()
         except:
             config.logger.exception(f"Could not save album with title {album.title}")
             messagebox.showerror('Editor error', f"Could not save album with title {album.title}")
@@ -722,7 +721,8 @@ class GUI:
     class SongEditWindow(object):
         """ Window for editing song fields."""
 
-        def __init__(self, master, song):
+        def __init__(self, master, song, edit_album_func):
+            self._edit_album_func = edit_album_func
             top = self.top = Toplevel(master)
             desc_label = Label(top, text=f'Editing song with title "{song.title}" of album "{song.album.title}" '
                                          f'from band {song.album.band}')
@@ -741,13 +741,14 @@ class GUI:
             file_name_label.grid(row=3, column=0)
             file_name_value_label = Label(top, text=song.file_name)
             file_name_value_label.grid(row=3, column=1)
-            button = Button(top, text='Save', command=self.save)
-            button.grid(row=4, column=0)
-            button = Button(top, text='Choose path', command=self.choose_path)
-            button.grid(row=4, column=1)
-            button = Button(top, text='Cancel', command=self.cancel)
-            button.grid(row=4, column=2)
-            # TODO: add a button to update album if review was not correct
+            button_save = Button(top, text='Save', command=self.save)
+            button_save.grid(row=4, column=0)
+            button_path = Button(top, text='Choose path', command=self.choose_path)
+            button_path.grid(row=4, column=1)
+            button_cancel = Button(top, text='Cancel', command=self.cancel)
+            button_cancel.grid(row=4, column=2)
+            button_change_album = Button(top, text='Change album', command=self.update_album)
+            button_change_album.grid(row=4, column=3)
             self.song = song
 
         def save(self):
@@ -769,6 +770,13 @@ class GUI:
             else:
                 return None
 
+        def update_album(self):
+            # call the _edit_album function. Do not refresh album list ()
+            # On the first hand we don want the album list to be refreshed when we manipulate songs
+            # but at the same time the current design does not support calls to more than 1 parallel thread
+            # and the refresh will call another thread while edit song is already called from the parallel thread
+            self._edit_album_func(album=self.song.album, do_refresh=False)
+
     def _edit_song(self, song):
         """Edits a song interactively.
         It will open a window to edit the different fields of the given song.
@@ -777,7 +785,7 @@ class GUI:
             song(Song): the song to update
         """
         old_song = copy.deepcopy(song)
-        song_window = self.SongEditWindow(self._window_root, song)
+        song_window = self.SongEditWindow(self._window_root, song, self._edit_album)
         self._window_root.wait_window(song_window.top)
         try:
             if old_song != song_window.song:
