@@ -77,6 +77,9 @@ class Song(DB_song):
         if not self._album:
             config.logger.error(f"Album of song is empty")
             return False
+        else:
+            if not self._album.validate():
+                return False
         if not self._title:
             config.logger.error(f"Title of song is empty")
             return False
@@ -84,18 +87,21 @@ class Song(DB_song):
             config.logger.error(f"Album of song is empty")
             return False
         elif not isinstance(self._album, Album):
-            config.logger.error(f"Album of song is not the right type. Expecting type {type(Album)} got {type(self._album)}")
+            config.logger.error(f"Album of song {self._title}is not the right type. Expecting type {type(Album)} got {type(self._album)}")
+            return False
+        if not self._file_name:
+            config.logger.error(f'Song {self._title} does not have a file name')
             return False
         if self._track_number and not self._score.isspace():
             try:
-                track_number = int(self._track_number)
-            except:
+                int(self._track_number)
+            except ValueError:
                 config.logger.error(f"Track number of song is not an integer")
                 return False
         if self._score and not self._score.isspace():
             try:
                 score = float(self._score)
-            except:
+            except ValueError:
                 config.logger.error(f"Score of song is not a Float")
                 return False
             else:

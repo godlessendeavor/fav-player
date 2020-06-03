@@ -32,8 +32,6 @@ songs_logger.addHandler(songs_log_handler)
 class MusicManager:
     _collection_root = config.MUSIC_PATH
     _music_db = config.music_db_api
-    _set_album_data_cb = None
-    _set_song_data_cb = None
     _music_dir_tree = None
     # this tree will contain the validated albums
     _valid_albums = {}
@@ -41,16 +39,6 @@ class MusicManager:
     _wrong_albums = {}
     # this tree will contain the new albums
     _new_albums = {}
-
-    @classmethod
-    def set_update_song_data_cb(cls, cb):
-        """Sets a callback to update the song data from the GUI."""
-        cls._set_song_data_cb = cb
-
-    @classmethod
-    def set_update_album_data_cb(cls, cb):
-        """Sets a callback to update the album data from the GUI."""
-        cls._set_album_data_cb = cb
 
     @classmethod
     def get_albums_from_collection(cls):
@@ -99,7 +87,6 @@ class MusicManager:
             raise ex
         else:
             config.logger.debug(f"Album {album.title} deleted from the database")
-            return album
 
     @classmethod
     def update_song(cls, song):
@@ -118,10 +105,22 @@ class MusicManager:
                 return song
         else:
             config.logger.error(f"Some problem with validation of song {song.title}")
+            raise Exception(f"Some problem with validation of song {song.title}")
         return song
 
     @classmethod
-    def get_favorites(cls, quantity=None, score=None):
+    def delete_song(cls, song):
+        """Function to delete a song from the server."""
+        try:
+            cls._music_db.api_songs_delete_song(song.id)
+        except Exception as ex:
+            config.logger.exception(f'Could not delete song with title {song.title} of album with title {song.album.title}')
+            raise ex
+        else:
+            config.logger.debug(f"Song {song.title} deleted from the database")
+
+    @classmethod
+    def get_random_favorites(cls, quantity=None, score=None):
         """Gets a list with random songs from the favorites list that complies with the required score.
         Arguments:
             quantity(int): the number of songs to return. If not specified it will return all songs.
@@ -148,7 +147,12 @@ class MusicManager:
          With this it will:
         1) Check if the song is already added as favorite.
         2) If not, add the song to the database with the corresponding info if the file is found
-        3) If not found, ask to update the necessary info if the file is not found."""
+        3) If not found, add to a list to return to the user to find later on.
+        Returns:
+            [song]: list of songs from the reviews that were not found in the collection.
+        """
+
+        songs_not_found = []
 
         # if the search for the collection was not performed before it will do it now
         if not cls._valid_albums:
@@ -164,33 +168,43 @@ class MusicManager:
                 song_db_dict[song_db.album.id] = [song_db]
         for band in cls._valid_albums:
             for album in cls._valid_albums[band].values():
-                song_title_list = re.findall(r'"([^"]*)"', album.review)
-                if not song_title_list:
-                    config.logger.warning(f'Album {album.title} has no favorites in the review')
+                if not album.review:
+                    album_logger.error(f'No review for album "{album.title}. Please add a review."')
                 else:
-                    songs_of_album = song_db_dict.get(album.id)
-                    for song in song_title_list:
-                        config.logger.info(f'Checking song with title "{song}"')
-                        song_found = False
-                        if songs_of_album:
-                            for song_in_album in songs_of_album:
-                                if song_in_album.title.casefold().strip() == song.casefold().strip():
-                                    song_found = True
-                                    songs_of_album.remove(song_in_album)
-                                    break
-                        if song_found:
-                            config.logger.info(f'Song {song} was found for album {album.title}')
-                        else:
-                            new_song = Song()
-                            new_song.album = album
-                            new_song.title = song
-                            # TODO: debatable if it should be initialized this way but it's compulsory so we need
-                            #  something
-                            new_song.score = album.score
-                            cls._search_and_update_song_file_name(new_song)
+                    song_title_list = re.findall(r'"([^"]*)"', album.review)
+                    if not song_title_list:
+                        album_logger.warning(
+                            f'Album {album.title} from band {album.band} has no favorites in the review')
+                    else:
+                        songs_of_album = song_db_dict.get(album.id)
+                        for song in song_title_list:
+                            config.logger.info(f'Checking song with title "{song}"')
+                            song_found = False
+                            if songs_of_album:
+                                for song_in_album in songs_of_album:
+                                    if song_in_album.title.casefold().strip() == song.casefold().strip():
+                                        song_found = True
+                                        songs_of_album.remove(song_in_album)
+                                        break
+                            if song_found:
+                                config.logger.info(f'Song {song} was found for album {album.title}')
+                            else:
+                                new_song = Song()
+                                new_song.album = album
+                                new_song.title = song
+                                # TODO: debatable if it should be initialized this way but it's compulsory so we need
+                                #  something
+                                new_song.score = album.score
+                                if not cls._search_and_update_song_file_name(new_song):
+                                    songs_not_found.append(new_song)
+        return songs_not_found
 
     @classmethod
     def add_song_to_favorites(cls, song):
+        """Adds a song to the favorites database.
+        Arguments:
+            song(Song): the song to add
+        """
         if isinstance(song, Song):
             if song.validate():
                 if not song.file_name:
@@ -498,15 +512,7 @@ class MusicManager:
         if not found_song:
             songs_logger.info(f'Song with title {song.title} from album title {song.album.title} '
                               f'and band {song.album.band} not found among the files of the corresponding album')
-            try:
-                # call the GUI function to set the file name interactively
-                found_song = cls._update_song_path_user_interactive(song)
-            except:
-                songs_logger.info(
-                    f'Could not update Song with title {song.title} from album title {song.album.title} '
-                    f'and band {song.album.band} among the files of the corresponding album')
-
-        if found_song:
+        else:
             # if found try to update this value in the server
             try:
                 cls._music_db.api_songs_update_song(song)
@@ -516,25 +522,6 @@ class MusicManager:
                     f'Could not update automatically Song with title {song.title} '
                     f'from album title {song.album.title} and band {song.album.band}'
                     f' among the files of the corresponding album')
-        return found_song
-
-    @classmethod
-    def _update_song_path_user_interactive(cls, song):
-        """Updates a song path by calling the callback to the UI and let the user choose the song filename.
-        Arguments:
-            song(Song): the song to update
-        Returns:
-            True if the song has been updated
-        """
-        found_song = False
-        cls._set_song_data_cb(song)
-        if song.file_name and os.path.isfile(song.file_name):
-            # getting diff path
-            diff_path = os.path.relpath(song.file_name, song.album.path)
-            config.logger.info(f"Setting file name from {song.file_name} to {diff_path}")
-            song.abs_path = song.file_name
-            song.file_name = diff_path
-            found_song = True
         return found_song
 
     @staticmethod

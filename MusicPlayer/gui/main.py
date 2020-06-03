@@ -4,7 +4,7 @@ import time
 import hashlib
 from concurrent.futures.thread import ThreadPoolExecutor
 from os import listdir
-from os.path import basename, dirname, isfile, join
+from os.path import basename, dirname, isfile, join, relpath
 from functools import partial
 
 import tkinter.messagebox as messagebox
@@ -48,11 +48,12 @@ class GUI:
         self._future = None
         # get the client to access the music_db server
         self._music_db = config.music_db_api
-        MusicManager.set_update_song_data_cb(self.update_song_data)
-        MusicManager.set_update_album_data_cb(self.update_album_data)
         self._albums_window = None
         # always initialize layout at the end because it contains the gui main loop
         self._init_main_window_layout()
+
+    # TODO: create a window for getting all favorites and be able to update and delete
+    # do it in the fashion of a treeview like the albums and with the albums as root
 
     def _init_main_window_layout(self):
         """
@@ -102,7 +103,7 @@ class GUI:
         self._file_sub_menu.add_command(label="Add reviews from filesystem to DB", command=review_add_to_db_func)
         add_songs_from_reviews_func = partial(self._execute_thread,
                                               self._add_songs_from_reviews_thread,
-                                              post_function=None)
+                                              post_function=self._update_song_list_interactively)
         self._file_sub_menu.add_command(label="Add songs from reviews", command=add_songs_from_reviews_func)
 
         # Create the Play sub menu
@@ -439,7 +440,7 @@ class GUI:
         self._window_root.update()
         if self._future:
             if self._future.running():
-                self._window_root.after(1000, self._check_thread, post_function, *args)
+                self._window_root.after(100, self._check_thread, post_function, *args)
             else:
                 try:
                     result = self._future.result()
@@ -521,7 +522,7 @@ class GUI:
         self.status_bar['text'] = 'Getting favorite songs'
         try:
             quantity = 10
-            songs = MusicManager.get_favorites(quantity, self._favorites_score)
+            songs = MusicManager.get_random_favorites(quantity, self._favorites_score)
             for song in songs:
                 self._add_song_to_playlist(song)
             self.status_bar['text'] = 'Favorite songs ready!'
@@ -618,11 +619,13 @@ class GUI:
         """Thread to add songs from reviews"""
         self.status_bar['text'] = 'Adding favorite songs from reviews to database'
         try:
-            MusicManager.add_songs_from_reviews()
+            not_found_songs = MusicManager.add_songs_from_reviews()
         except Exception as ex:
             config.logger.exception("Exception adding favorite songs from reviews to the db")
             messagebox.showerror("Error", "Error adding favorite songs from reviews db. Please check logging.")
             raise ex
+        else:
+            return not_found_songs
 
     # --------------- POP UP ACTIONS -----------------------------------------------------------#
 
@@ -722,6 +725,7 @@ class GUI:
         """ Window for editing song fields."""
 
         def __init__(self, master, song, edit_album_func):
+            self.canceled = False
             self._edit_album_func = edit_album_func
             top = self.top = Toplevel(master)
             desc_label = Label(top, text=f'Editing song with title "{song.title}" of album "{song.album.title}" '
@@ -757,25 +761,36 @@ class GUI:
             self.top.destroy()
 
         def cancel(self):
+            self.canceled = True
             self.top.destroy()
 
         def choose_path(self):
-            file_name = filedialog.askopenfilenames(initialdir=config.MUSIC_PATH, parent=self.top,
+            initialdir = self.song.album.path if self.song.album.path else config.MUSIC_PATH
+            file_name = filedialog.askopenfilenames(initialdir=initialdir, parent=self.top,
                                                     title=f"Choose file for song {self.song.title} "
                                                           f"from album title {self.song.album.title} "
                                                           f"and band {self.song.album.band}")
             if file_name:
-                self.song.file_name = file_name[0]
+                diff_path = relpath(file_name[0], self.song.album.path)
+                config.logger.info(f"Setting file name from {self.song.file_name} to {diff_path}")
+                self.song.abs_path = file_name[0]
+                self.song.file_name = diff_path
                 return self.song
             else:
                 return None
 
         def update_album(self):
             # call the _edit_album function. Do not refresh album list ()
-            # On the first hand we don want the album list to be refreshed when we manipulate songs
-            # but at the same time the current design does not support calls to more than 1 parallel thread
-            # and the refresh will call another thread while edit song is already called from the parallel thread
+            # we don't want the album list to be refreshed when we manipulate songs
             self._edit_album_func(album=self.song.album, do_refresh=False)
+
+    def _update_song_list_interactively(self, song_list):
+        """Prompts the user to update a list of songs interactively
+        Arguments:
+            song_list([song]): the list of songs to update
+        """
+        for song in song_list:
+            self._edit_song(song)
 
     def _edit_song(self, song):
         """Edits a song interactively.
@@ -785,14 +800,16 @@ class GUI:
             song(Song): the song to update
         """
         old_song = copy.deepcopy(song)
+        # TODO: copy only the song attributes and not the album. If the album is manipulated we don want to update the song
         song_window = self.SongEditWindow(self._window_root, song, self._edit_album)
         self._window_root.wait_window(song_window.top)
-        try:
-            if old_song != song_window.song:
-                MusicManager.update_song(song_window.song)
-        except:
-            config.logger.exception(f"Could not save song with title {song.title}")
-            messagebox.showerror('Editor error', f"Could not save song with title {song.title}")
+        if not song_window.canceled:
+            try:
+                if old_song != song_window.song:
+                    MusicManager.update_song(song_window.song)
+            except:
+                config.logger.exception(f"Could not save song with title {song.title}")
+                messagebox.showerror('Editor error', f"Could not save song with title {song.title}")
 
     class DeleteQuestionWindow(object):
         """ Window for editing album fields."""
@@ -1077,20 +1094,6 @@ class GUI:
         """
         self._execute_thread(self._get_album_list_thread, post_function=self._add_to_album_list)
         self.status_bar['text'] = 'Album list ready'
-
-    def update_song_data(self, song):
-        """Callback function to update interactively song data.
-        Arguments:
-            song(Song): the song to update
-        """
-        self._edit_song(song)
-
-    def update_album_data(self, album):
-        """Callback function to update interactively album data.
-        Arguments:
-            album(Album): the album to update
-        """
-        self._edit_album(album)
 
     def _show_details(self):
         """
