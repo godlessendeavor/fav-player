@@ -150,6 +150,7 @@ class DatabaseProvider(object):
             except KeyError:
                 logger.warning('Type of song was not provided for song: ', song)
 
+
             try:
                 fav.id = song['id']
             except KeyError:
@@ -160,6 +161,12 @@ class DatabaseProvider(object):
                         fav.id = result[0]['id']
                     except KeyError:
                         logger.exception('Exception on value when creating favorite song')
+                        return None, 400
+            else:
+                result = self._search_song_by_title_and_album_id(fav.title, fav.album_id)
+                logger.error(f'Song with title {fav.title} for album with id {fav.album_id} already exists in the database')
+                if result and result[0]:
+                    return None, 400
             # save object in database
             fav.save()
             return song, 200
