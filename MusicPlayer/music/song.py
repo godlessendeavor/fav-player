@@ -141,7 +141,7 @@ class Song(DB_song):
 
                         tagsv2 = tags['ID3TagV2']
                     except Exception:
-                        config.logger.exception("Some exception occurred while reading MP3 tags.")
+                        config.logger.exception(f"Some exception occurred while reading MP3 tags for {song_path}.")
                     else:
                         if not self._band and 'artist' in tagsv2:
                             self._band = tagsv2['artist']

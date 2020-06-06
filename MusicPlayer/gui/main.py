@@ -41,6 +41,7 @@ class GUI:
         self._parallel_thread = None  # the thread for executing parallel tasks alongside the GUI main loop
         self._playlist = {}  # dictionary containing the song objects of the playlist
         self._albums_list = {}  # dictionary containing the album objects for the album list
+        self._songs_list = {}  # dictionary containing the songs objects for the songs list
         self._albums_from_server = {}  # preliminary dictionary containing the data from the server, to be processed to _albums_list
         self._details_thread = threading.Thread(target=self._start_count)
         self._stop_details_thread = False
@@ -92,7 +93,7 @@ class GUI:
         album_list_func = partial(self._execute_thread,
                                   self._get_album_list_thread,
                                   post_function=self._show_album_list)
-        self._file_sub_menu.add_command(label="Open List", command=album_list_func)
+        self._file_sub_menu.add_command(label="Open album collection", command=album_list_func)
         album_add_to_db_func = partial(self._execute_thread,
                                        self._add_albums_to_db_thread,
                                        post_function=self._show_album_list)
@@ -105,6 +106,14 @@ class GUI:
                                               self._add_songs_from_reviews_thread,
                                               post_function=self._update_song_list_interactively)
         self._file_sub_menu.add_command(label="Add songs from reviews", command=add_songs_from_reviews_func)
+
+        # create the favorite songs sub menu
+        self._songs_sub_menu = Menu(self._menu_bar, tearoff=0)
+        self._menu_bar.add_cascade(label="Songs", menu=self._songs_sub_menu)
+        song_list_func = partial(self._execute_thread,
+                                 self._get_favorites_list_thread,
+                                 post_function=self._show_favorites_list)
+        self._songs_sub_menu.add_command(label="Open list of favorite songs", command=song_list_func)
 
         # Create the Play sub menu
         self._play_sub_menu = Menu(self._menu_bar, tearoff=0)
@@ -181,7 +190,7 @@ class GUI:
 
         # ADD DELETE BUTTONS
         self.add_button = ttk.Button(self._bottom_left_frame, text="+ Add", command=self._browse_file)
-        self.delete_button = ttk.Button(self._bottom_left_frame, text="- Del", command=self._delete_song)
+        self.delete_button = ttk.Button(self._bottom_left_frame, text="- Del", command=self._delete_song_from_playlist)
 
         self.add_button.pack(side=LEFT)
         self.delete_button.pack(side=RIGHT)
@@ -229,9 +238,7 @@ class GUI:
         self._window_root.mainloop()
 
     def _init_albums_window_layout(self):
-        """
-            Initializes the albums window layout
-        """
+        """Initializes the albums window layout"""
         if not self._albums_window:
             self._albums_window = tk.ThemedTk()
             self._albums_window.protocol("WM_DELETE_WINDOW", self._on_closing_album_window)
@@ -339,7 +346,7 @@ class GUI:
             def do_album_delete():
                 """Deletes the selected album"""
                 try:
-                    self._delete_album(self._albums_list[self._album_list_popup.selection])
+                    self._delete_album_from_collection(self._albums_list[self._album_list_popup.selection])
                 except KeyError:
                     # not an album but a band key, do nothing.
                     pass
@@ -404,6 +411,108 @@ class GUI:
                                                                                           anchor=NW)
 
             self._album_list_popup.selection = None
+
+    def _init_songs_window_layout(self):
+        """Initializes the songs window layout"""
+        if not self._songs_window:
+            self._songs_window = tk.ThemedTk()
+            self._songs_window.protocol("WM_DELETE_WINDOW", self._on_closing_song_window)
+
+            self._songs_window.get_themes()  # Returns a list of all themes that can be set
+            self._songs_window.set_theme("radiance")  # Sets an available theme
+            self._songs_window.title("Favorite songs")
+            self._songs_window.geometry("1400x600")
+
+            self._song_status_bar = ttk.Label(self._songs_window, text="Favorite songs", relief=SUNKEN, anchor=W,
+                                              font='Times 12')
+            self._song_status_bar.pack(side=BOTTOM, fill=X)
+
+            # variable that stores the selected song
+            self._selected_song = None
+
+            # SONG WINDOW FRAMES STRUCTURE
+
+            self._top_song_frame = Frame(self._songs_window)
+            self._top_song_frame.pack(side=TOP, expand=True)
+
+            # SONG LIST
+            v_scroll_bar = Scrollbar(self._top_song_frame, orient="vertical")
+
+            self._song_listbox = ttk.Treeview(self._top_song_frame, yscrollcommand=v_scroll_bar.set, height=20)
+            self._song_listbox["columns"] = ('Band', 'Title', 'Album title', 'Score', 'File Name', 'Available')
+            self._song_listbox.heading("Band", text="Band", anchor=W)
+            self._song_listbox.heading("Title", text="Title", anchor=W)
+            self._song_listbox.heading("Album title", text="Album title", anchor=W)
+            self._song_listbox.heading("Score", text="Score", anchor=W)
+            self._song_listbox.heading("File name", text="File name", anchor=W)
+            self._song_listbox.heading("Available", text="Available", anchor=W)
+            self._song_listbox["show"] = "headings"  # This will remove the first column from the viewer
+            # (first column of this widget is the identifier of the row)
+            # add functionality for sorting
+            for col in self._song_listbox["columns"]:
+                self._song_listbox.heading(col, text=col, command=lambda _col=col: \
+                    GUI._tree_view_sort_column(self._song_listbox, _col, False))
+
+            self._song_listbox.column("Band", minwidth=0, width=220)
+            self._song_listbox.column("Title", minwidth=0, width=280)
+            self._song_listbox.column("Album title", minwidth=0, width=160)
+            self._song_listbox.column("Score", minwidth=0, width=40)
+            self._song_listbox.column("File name", minwidth=0, width=160)
+            self._song_listbox.column("Available", minwidth=0, width=20)
+
+            v_scroll_bar.config(command=self._song_listbox.yview)
+            v_scroll_bar.pack(side=RIGHT, fill=Y, expand=True)
+
+            self._song_listbox.pack(side=LEFT, fill=BOTH, expand=True)
+
+            def do_song_list_popup(event):
+                # display the _song_list_popup menu
+                try:
+                    self._song_list_popup.selection = self._song_listbox.identify_row(event.y)
+                    self._song_list_popup.post(event.x_root, event.y_root)
+                finally:
+                    # make sure to release the grab (Tk 8.0a1 only)
+                    self._song_list_popup.grab_release()
+
+            def do_song_list_play_song():
+                """Plays selected song on popup"""
+                row = self._song_list_popup.selection
+                try:
+                    song = self._songs_list[row]
+                except KeyError:
+                    # not an song but a band key, do not play
+                    pass
+                else:
+                    file_names = [f for f in listdir(song.path) if isfile(join(song.path, f))]
+                    for file_name in file_names:
+                        self._add_file_to_playlist(join(song.path, file_name), song)
+                    self._play_music()
+
+            def do_song_edit():
+                """Edits the selected song"""
+                try:
+                    self._edit_song(self._songs_list[self._song_list_popup.selection])
+                except KeyError:
+                    # not an song but a band key, do not edit
+                    pass
+
+            def do_song_delete():
+                """Deletes the selected song"""
+                try:
+                    self._delete_song_from_collection(self._songs_list[self._song_list_popup.selection])
+                except KeyError:
+                    # not an song but a band key, do nothing.
+                    pass
+
+            self._song_list_popup = Menu(self._songs_window, tearoff=0)
+            self._song_list_popup.add_command(label="Play song", command=do_song_list_play_song)
+            self._song_list_popup.add_command(label="Edit song", command=do_song_edit)
+            self._song_list_popup.add_command(label="Delete song", command=do_song_delete)
+
+            # add popup to song_list tree view
+            self._song_listbox.bind("<Button-3>", do_song_list_popup)
+
+            self._song_list_popup.selection = None
 
     # ------------------ TASKS EXECUTION -----------------------------------------------------#
     # ------------------ TASKS EXECUTION -----------------------------------------------------#
@@ -592,6 +701,31 @@ class GUI:
         else:
             return albums_from_server
 
+    # --------------------------- GET THE FAVORITES LIST ----------------------------------------------#
+
+    def _show_favorites_list(self, song_dict):
+        """Function to be called after the get favorites list thread
+        Args: 
+            song_dict(dict): song dictionary with band as keys and values as a dict of songs
+        """
+        if song_dict:
+            self._init_songs_window_layout()
+            self._add_to_favorites_list(song_dict)
+            self.status_bar['text'] = 'Song list ready'
+        else:
+            messagebox.showerror("Error", "Error getting favorites list. Please check logging.")
+
+    def _get_favorites_list_thread(self):
+        """Thread to get the song list from the collection and database."""
+        self.status_bar['text'] = 'Getting song list'
+        try:
+            songs_from_server = MusicManager.get_random_favorites()
+        except Exception as ex:
+            config.logger.exception("Exception when getting song collection")
+            raise ex
+        else:
+            return songs_from_server
+
     # --------------------------- UPDATE REVIEWS ----------------------------------------------#
 
     def _add_reviews_to_db_thread(self):
@@ -653,41 +787,47 @@ class GUI:
             top = self.top = Toplevel(master)
             desc_label = Label(top, text=f'Editing album with title "{album.title}" of band "{album.band}"')
             desc_label.grid(row=0, column=1)
+            title_label = Label(top, text="Title")
+            title_label.grid(row=1, column=0)
+            self.title_entry = Entry(top)
+            self.title_entry.grid(row=1, column=1)
+            self.title_entry.insert(END, str(album.title) if album.title else '')
             style_label = Label(top, text="Style")
-            style_label.grid(row=1, column=0)
+            style_label.grid(row=2, column=0)
             self.style_entry = Entry(top)
-            self.style_entry.grid(row=1, column=1)
+            self.style_entry.grid(row=2, column=1)
             self.style_entry.insert(END, str(album.style) if album.style else '')
             year_label = Label(top, text="Year")
-            year_label.grid(row=2, column=0)
+            year_label.grid(row=3, column=0)
             self.year_entry = Entry(top)
-            self.year_entry.grid(row=2, column=1)
+            self.year_entry.grid(row=3, column=1)
             self.year_entry.insert(END, str(album.year) if album.year else '')
             country_label = Label(top, text="Country/State")
-            country_label.grid(row=3, column=0)
+            country_label.grid(row=4, column=0)
             self.country_entry = Entry(top)
-            self.country_entry.grid(row=3, column=1)
+            self.country_entry.grid(row=4, column=1)
             self.country_entry.insert(END, str(album.country) if album.country else '')
             type_label = Label(top, text="Type")
-            type_label.grid(row=4, column=0)
+            type_label.grid(row=5, column=0)
             self.type_entry = Entry(top)
-            self.type_entry.grid(row=4, column=1)
+            self.type_entry.grid(row=5, column=1)
             self.type_entry.insert(END, str(album.type) if album.type else '')
             score_label = Label(top, text="Score")
-            score_label.grid(row=5, column=0)
+            score_label.grid(row=6, column=0)
             self.score_entry = Entry(top)
-            self.score_entry.grid(row=5, column=1)
+            self.score_entry.grid(row=6, column=1)
             self.score_entry.insert(END, str(album.score) if album.score else '')
             review_label = Label(top, text="Review")
-            review_label.grid(row=6, column=0)
+            review_label.grid(row=7, column=0)
             self._review_text_box_album = Text(top, font='Times 12', relief=GROOVE, height=15, width=100)
-            self._review_text_box_album.grid(row=6, column=1)
+            self._review_text_box_album.grid(row=7, column=1)
             self._review_text_box_album.insert(END, str(album.review) if album.review else '')
             button = Button(top, text='Save', command=self.save)
-            button.grid(row=7, column=1)
+            button.grid(row=8, column=1)
             self.album = album
 
         def save(self):
+            self.album.title = self.title_entry.get().strip()
             self.album.style = self.style_entry.get().strip()
             self.album.year = self.year_entry.get().strip()
             self.album.country = self.country_entry.get().strip()
@@ -800,7 +940,6 @@ class GUI:
             song(Song): the song to update
         """
         old_song = copy.deepcopy(song)
-        # TODO: copy only the song attributes and not the album. If the album is manipulated we don want to update the song
         song_window = self.SongEditWindow(self._window_root, song, self._edit_album)
         self._window_root.wait_window(song_window.top)
         if not song_window.canceled:
@@ -814,11 +953,10 @@ class GUI:
     class DeleteQuestionWindow(object):
         """ Window for editing album fields."""
 
-        def __init__(self, master, album):
+        def __init__(self, master, item_name):
             top = self.top = Toplevel(master)
             self.delete = False
-            desc_label = Label(top,
-                               text=f'Are you sure you want to delete album with title "{album.title}" of band "{album.band}"')
+            desc_label = Label(top, text=f'Are you sure you want to delete the item "{item_name}"')
             desc_label.grid(row=0, column=1)
             button = Button(top, text='Yes', command=self.do_delete)
             button.grid(row=1, column=1)
@@ -832,13 +970,29 @@ class GUI:
         def quit(self):
             self.top.destroy()
 
-    def _delete_album(self, album):
-        """Deletes an album.
-            @param: album, the album to edit
-        """
-        delete_question_window = self.DeleteQuestionWindow(self._window_root, album)
+    def _delete_question(self, item):
+
+        delete_question_window = self.DeleteQuestionWindow(self._window_root, item)
         self._window_root.wait_window(delete_question_window.top)
-        if delete_question_window.delete:
+        return delete_question_window.delete
+
+    def _delete_song_from_playlist(self):
+        """Deletes the selected song from the playlist.
+            It does not remove it from the server even if it's a favorite song.
+        """
+        selected_songs = self._playlistbox.selection()
+        if selected_songs:
+            for selected_song in selected_songs:
+                self._playlistbox.delete(selected_song)
+                self._playlist.pop(selected_song)
+            self._player.delete_from_playlist(selected_songs)
+
+    def _delete_album_from_collection(self, album):
+        """Deletes an album from the collection.
+        Args:
+            album(Album): the album to delete
+        """
+        if self._delete_question(f'{album.title} from {album.band}'):
             try:
                 MusicManager.delete_album(album)
                 # remove the selected album so review is not updated again
@@ -848,17 +1002,19 @@ class GUI:
                 config.logger.exception(f"Could not delete album with title {album.title}")
                 messagebox.showerror('Editor error', f"Could not delete album with title {album.title}")
 
-    def _delete_song(self):
+    def _delete_song_from_collection(self, song):
+        """Deletes a song from the favorites database.
+        Args:
+            song(Song): the song to delete
         """
-            Deletes the selected song from the playlist.
-            It does not remove it from the server even if it's a favorite song.
-        """
-        selected_songs = self._playlistbox.selection()
-        if selected_songs:
-            for selected_song in selected_songs:
-                self._playlistbox.delete(selected_song)
-                self._playlist.pop(selected_song)
-            self._player.delete_from_playlist(selected_songs)
+        if self._delete_question(f'{song.title} from {song.album.title}'):
+            try:
+                MusicManager.delete_album(song)
+                self._selected_song = None
+                self._refresh_song_list()
+            except:
+                config.logger.exception(f"Could not delete song with title {song.title}")
+                messagebox.showerror('Editor error', f"Could not delete song with title {song.title}")
 
     def _play_music(self, song_list=None):
         """
@@ -954,6 +1110,7 @@ class GUI:
         self._stop_music()
         self._stop_details_thread = True
         self._on_closing_album_window()
+        self._on_closing_song_window()
         self._window_root.destroy()
 
     def _on_closing_album_window(self):
@@ -979,6 +1136,16 @@ class GUI:
             try:
                 self._albums_window.destroy()
                 self._albums_window = None
+            except Exception:
+                # window might have already been destroyed
+                pass
+
+    def _on_closing_song_window(self):
+        """Event called on songs window closure."""
+        if hasattr(self, '_songs_window'):
+            try:
+                self._songs_window.destroy()
+                self._songs_window = None
             except Exception:
                 # window might have already been destroyed
                 pass
@@ -1088,24 +1255,54 @@ class GUI:
         self._album_listbox.tag_configure('odd_row', background='#D9FFDB')
         self._album_listbox.tag_configure('even_row', background='#FFE5CD')
 
+    def _add_to_favorites_list(self, song_dict):
+        """Add input dict to song tree view
+        Args:
+            song_dict (dict): the dict of songs to add to the song list.
+        """
+
+        # remove existing tree if there were any items
+        try:
+            self._song_listbox.delete(*self._song_listbox.get_children())
+        except:
+            config.logger.warning("Some error when refreshing favorite songs list")
+
+        song_index = 1
+        for song_key, songs in sorted(song_dict.items()):
+            # add tags for identifying which background color to apply
+            # if song_index % 2:
+            #     tags = ('odd_row',)
+            # else:
+            #     tags = ('even_row',)
+            song = next(iter(songs.values()))
+            self._song_listbox.insert("", song_index, text=song.title,
+                                      values=(song.album.band,
+                                              song.title,
+                                              song.album.title,
+                                              song.score,
+                                              song.file_name,
+                                              True
+                                              # TODO add a function to check if the song is in the filesystem #song.available,
+                                              ))
+            # , tags=tags)
+
     def _refresh_album_list(self):
-        """
-            Refreshes the album list.
-        """
+        """Refreshes the album list."""
         self._execute_thread(self._get_album_list_thread, post_function=self._add_to_album_list)
         self.status_bar['text'] = 'Album list ready'
 
+    def _refresh_song_list(self):
+        """Refreshes the song list."""
+        self._execute_thread(self._get_favorites_list_thread, post_function=self._add_to_favorites_list)
+        self.status_bar['text'] = 'Song list ready'
+
     def _show_details(self):
-        """
-            Starts the player time details thread 
-        """
+        """Starts the player time details thread."""
         if not self._stop_details_thread and not self._details_thread.is_alive():
             self._details_thread.start()
 
     def _start_count(self):
-        """
-            Implementation of timer details thread
-        """
+        """Implementation of timer details thread."""
         while not self._stop_details_thread:
             while self._player.is_playing():
                 self._current_time_label['text'] = "Current Time" + ' - ' + self._player.get_time()
