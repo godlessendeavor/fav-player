@@ -6,6 +6,7 @@ Created on Dec 3, 2019
 import difflib
 from functools import reduce, lru_cache
 import os
+from os.path import relpath
 import dateutil.parser as date_parser
 import logging
 import re
@@ -106,7 +107,6 @@ class MusicManager:
         else:
             config.logger.error(f"Some problem with validation of song {song.title}")
             raise Exception(f"Some problem with validation of song {song.title}")
-        return song
 
     @classmethod
     def delete_song(cls, song):
@@ -138,7 +138,29 @@ class MusicManager:
             config.logger.exception('Exception when getting favorite songs')
             raise ex
         else:
-            return [song for song in cls._get_songs_in_fs(result.songs)]
+            return cls._get_songs_in_fs(result.songs)
+
+    @classmethod
+    def get_favorites(cls, ids=None, check_collection=False):
+        """Gets a list of favorite songs from the database and collection from the given ids.
+        If no ids are given it will return all favorites.
+        Args:
+           ids([int]): The database ids of requested favorite songs.
+           check_collection(bool): indicates if the file system should be checked(True) or not(False).
+        Returns:
+            ([Song], [Song]): tuple of :
+                list of favorite songs that matches the arguments specified
+                list of invalid songs that do fail to run validation check
+        """
+        try:
+            result = cls._music_db.api_songs_get_songs()
+        except Exception as ex:
+            config.logger.exception('Exception when getting favorite songs')
+            raise ex
+        if check_collection:
+            return cls._get_songs_in_fs(result.songs)
+        else:
+            return [Song(song) for song in result.songs], []
 
     @classmethod
     def add_songs_from_reviews(cls):
@@ -423,8 +445,10 @@ class MusicManager:
     def _get_songs_in_fs(cls, song_list):
         """Gets songs from the given list that exist on the File System.
         Returns:
-            generator with the songs that exist on the file system
+            list with the songs that exist on the file system
         """
+        existing_songs = []
+        wrong_songs = []
         if not isinstance(song_list, list):
             config.logger.error(f'song_list is not of list type')
         else:
@@ -433,6 +457,7 @@ class MusicManager:
             # for every song in the database result search the album info in the database
             for db_song in song_list:
                 # if it's the same band then we continue, otherwise there might be a mistake
+                song = Song(db_song)  # merge the database info with the info got from the filesystem
                 band_key = db_song.album.band.casefold()
                 if band_key in albums_dict.keys():
                     found_album = False
@@ -441,8 +466,7 @@ class MusicManager:
                     for album in albums_dict[band_key].values():
                         if album.id == db_song.album.id:
                             found_album = True
-                            song = Song(db_song)  # merge the database info with the info got from the filesystem
-                            song.album = album
+                            song.album = Album().merge(album)
                             found_song = False
                             if song.file_name:
                                 abs_path = os.path.join(album.path, song.file_name)
@@ -451,8 +475,8 @@ class MusicManager:
                                     found_song = True
                                 else:
                                     songs_logger.info(
-                                        f'Could not find song with title {song.title} from album title '
-                                        f'{song.album.title} and band {song.album.band} '
+                                        f'Could not find song with title {song.title} and file {song.file_name} '
+                                        f'from album title {song.album.title} and band {song.album.band} '
                                         f'among the files of the corresponding album')
                                     # search for the song in the album path
                                     found_song = cls._search_and_update_song_file_name(song)
@@ -465,13 +489,21 @@ class MusicManager:
                                 found_song = cls._search_and_update_song_file_name(song)
 
                             if found_song:
-                                yield song
-                            break
+                                existing_songs.append(song)
+                                break
+                            else:
+                                wrong_songs.append(song)
+
                     if not found_album:
                         songs_logger.info(f"Album with database id {db_song.album.id} not found in "
-                                          f"database for song title {db_song.title} and {db_song.id}")
+                                          f"database for song title {db_song.title} and {db_song.id}. "
+                                          f"Albums of band {db_song.album.band} are:"
+                                          f"{albums_dict[band_key].values()}")
+                        wrong_songs.append(song)
                 else:
                     songs_logger.info(f"Band {db_song.album.band} not found in the list of bands")
+                    wrong_songs.append(song)
+        return existing_songs, wrong_songs
 
     @classmethod
     def _search_and_update_song_file_name(cls, song):
@@ -492,7 +524,8 @@ class MusicManager:
                 if song.title.casefold() in file_name.casefold() and ".mp3" in file_name:
                     found_song = True
                     song.abs_path = abs_path
-                    song.file_name = file_name
+                    diff_path = relpath(abs_path, song.album.path)
+                    song.file_name = diff_path
                     break
                 # if not found keep extending the dict with the files to search for close matches later
                 elif ".mp3" in file_name:
@@ -507,7 +540,8 @@ class MusicManager:
             if match_song:
                 found_song = True
                 song.abs_path = song_files[match_song[0]]
-                song.file_name = match_song[0]
+                diff_path = relpath(song.abs_path, song.album.path)
+                song.file_name = diff_path
 
         if not found_song:
             songs_logger.info(f'Song with title {song.title} from album title {song.album.title} '

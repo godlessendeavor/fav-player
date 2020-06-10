@@ -50,6 +50,7 @@ class GUI:
         # get the client to access the music_db server
         self._music_db = config.music_db_api
         self._albums_window = None
+        self._songs_window = None
         # always initialize layout at the end because it contains the gui main loop
         self._init_main_window_layout()
 
@@ -439,7 +440,7 @@ class GUI:
             v_scroll_bar = Scrollbar(self._top_song_frame, orient="vertical")
 
             self._song_listbox = ttk.Treeview(self._top_song_frame, yscrollcommand=v_scroll_bar.set, height=20)
-            self._song_listbox["columns"] = ('Band', 'Title', 'Album title', 'Score', 'File Name', 'Available')
+            self._song_listbox["columns"] = ('Band', 'Title', 'Album title', 'Score', 'File name', 'Available')
             self._song_listbox.heading("Band", text="Band", anchor=W)
             self._song_listbox.heading("Title", text="Title", anchor=W)
             self._song_listbox.heading("Album title", text="Album title", anchor=W)
@@ -559,7 +560,7 @@ class GUI:
                     # append the result from the thread to the post_function arguments
                     if result:
                         args = list(args)
-                        args.append(result)
+                        args.extend(result)
                     self._progressbar.stop()
                     # call the post function once the thread is finished
                     if post_function:
@@ -631,7 +632,7 @@ class GUI:
         self.status_bar['text'] = 'Getting favorite songs'
         try:
             quantity = 10
-            songs = MusicManager.get_random_favorites(quantity, self._favorites_score)
+            songs, _ = MusicManager.get_random_favorites(quantity, self._favorites_score)
             for song in songs:
                 self._add_song_to_playlist(song)
             self.status_bar['text'] = 'Favorite songs ready!'
@@ -703,14 +704,46 @@ class GUI:
 
     # --------------------------- GET THE FAVORITES LIST ----------------------------------------------#
 
-    def _show_favorites_list(self, song_dict):
+    class SongEditQuestionWindow(object):
+        """ Window for asking to edit song fields."""
+
+        def __init__(self, master, list_len):
+            top = self.top = Toplevel(master)
+            self.edit = False
+            desc_label = Label(top, text=f'Do you want to edit the wrong songs {list_len}')
+            desc_label.grid(row=0, column=1)
+            button = Button(top, text='Yes', command=self.do_edit)
+            button.grid(row=1, column=1)
+            button = Button(top, text='No', command=self.quit)
+            button.grid(row=1, column=2)
+
+        def do_edit(self):
+            self.edit = True
+            self.top.destroy()
+
+        def quit(self):
+            self.top.destroy()
+
+    def _show_favorites_list(self, valid_songs, wrong_songs):
         """Function to be called after the get favorites list thread
         Args: 
-            song_dict(dict): song dictionary with band as keys and values as a dict of songs
+            valid_songs(list): list of valid songs
+            wrong_songs(list): list of wrong songs
         """
-        if song_dict:
+        if valid_songs:
             self._init_songs_window_layout()
-            self._add_to_favorites_list(song_dict)
+            for song in valid_songs:
+                song.available = True
+            for song in wrong_songs:
+                song.available = False
+            all_songs = valid_songs
+            all_songs.extend(wrong_songs)
+            self._add_to_favorites_list(all_songs)
+            edit_question_window = self.SongEditQuestionWindow(self._window_root, len(wrong_songs))
+            self._window_root.wait_window(edit_question_window.top)
+            if edit_question_window.edit:
+                for song in wrong_songs:
+                    self._edit_song(song)
             self.status_bar['text'] = 'Song list ready'
         else:
             messagebox.showerror("Error", "Error getting favorites list. Please check logging.")
@@ -719,12 +752,12 @@ class GUI:
         """Thread to get the song list from the collection and database."""
         self.status_bar['text'] = 'Getting song list'
         try:
-            songs_from_server = MusicManager.get_random_favorites()
+            valid_songs, wrong_songs = MusicManager.get_favorites(check_collection=True)
         except Exception as ex:
             config.logger.exception("Exception when getting song collection")
             raise ex
         else:
-            return songs_from_server
+            return valid_songs, wrong_songs
 
     # --------------------------- UPDATE REVIEWS ----------------------------------------------#
 
@@ -905,7 +938,7 @@ class GUI:
             self.top.destroy()
 
         def choose_path(self):
-            initialdir = self.song.album.path if self.song.album.path else config.MUSIC_PATH
+            initialdir = self.song.album.path if hasattr(self.song.album, 'path') and self.song.album.path else config.MUSIC_PATH
             file_name = filedialog.askopenfilenames(initialdir=initialdir, parent=self.top,
                                                     title=f"Choose file for song {self.song.title} "
                                                           f"from album title {self.song.album.title} "
@@ -1255,10 +1288,10 @@ class GUI:
         self._album_listbox.tag_configure('odd_row', background='#D9FFDB')
         self._album_listbox.tag_configure('even_row', background='#FFE5CD')
 
-    def _add_to_favorites_list(self, song_dict):
+    def _add_to_favorites_list(self, song_list):
         """Add input dict to song tree view
         Args:
-            song_dict (dict): the dict of songs to add to the song list.
+            song_list (list): the dict of songs to add to the song list.
         """
 
         # remove existing tree if there were any items
@@ -1268,23 +1301,21 @@ class GUI:
             config.logger.warning("Some error when refreshing favorite songs list")
 
         song_index = 1
-        for song_key, songs in sorted(song_dict.items()):
+        for song in sorted(song_list, key=lambda song_from_list: song_from_list.album.band):
             # add tags for identifying which background color to apply
             # if song_index % 2:
             #     tags = ('odd_row',)
             # else:
             #     tags = ('even_row',)
-            song = next(iter(songs.values()))
-            self._song_listbox.insert("", song_index, text=song.title,
+            song_id = self._song_listbox.insert("", song_index, text=song.title,
                                       values=(song.album.band,
                                               song.title,
                                               song.album.title,
                                               song.score,
                                               song.file_name,
-                                              True
-                                              # TODO add a function to check if the song is in the filesystem #song.available,
-                                              ))
+                                              song.available))
             # , tags=tags)
+            self._songs_list[song_id] = song
 
     def _refresh_album_list(self):
         """Refreshes the album list."""

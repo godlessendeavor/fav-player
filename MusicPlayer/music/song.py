@@ -138,7 +138,6 @@ class Song(DB_song):
                         # get tags
                         mp3_file = MP3File(song_path)
                         tags = mp3_file.get_tags()
-
                         tagsv2 = tags['ID3TagV2']
                     except Exception:
                         config.logger.exception(f"Some exception occurred while reading MP3 tags for {song_path}.")
