@@ -29,6 +29,9 @@ songs_logger = logging.getLogger('songs')
 album_logger.addHandler(album_log_handler)
 songs_logger.addHandler(songs_log_handler)
 
+# TODO: extend the music types
+SUPPORTED_MUSIC_TYPES = ['mp3']
+
 
 class MusicManager:
     _collection_root = config.MUSIC_PATH
@@ -523,15 +526,17 @@ class MusicManager:
         for folder, dirs, files in os.walk(song.album.path):
             for file_name in files:
                 abs_path = os.path.join(folder, file_name)
-                if song.title.casefold() in file_name.casefold() and ".mp3" in file_name:
-                    found_song = True
-                    song.abs_path = abs_path
-                    diff_path = relpath(abs_path, song.album.path)
-                    song.file_name = diff_path
-                    break
-                # if not found keep extending the dict with the files to search for close matches later
-                elif ".mp3" in file_name:
-                    song_files[file_name] = abs_path
+                # check if file is any of the music supported types
+                if any(ext in song.title.casefold() for ext in SUPPORTED_MUSIC_TYPES):
+                    if song.title.casefold() in file_name.casefold():
+                        found_song = True
+                        song.abs_path = abs_path
+                        diff_path = relpath(abs_path, song.album.path)
+                        song.file_name = diff_path
+                        break
+                    # if not found keep extending the dict with the files to search for close matches later
+                    else:
+                        song_files[file_name] = abs_path
             # if not found we extend the list in order to search for close matches later
             if found_song:
                 break
