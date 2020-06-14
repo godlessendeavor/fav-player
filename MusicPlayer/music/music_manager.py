@@ -565,14 +565,50 @@ class MusicManager:
                     f' among the files of the corresponding album')
         return found_song
 
-    @staticmethod
-    def get_album_list_for_band(band_name: str, country: str, style: str):
+    @classmethod
+    def get_missing_albums_for_bands(cls, band_list):
+        """Gets a list of the albums from the given bands which are not present on the collection.
+        Args:
+            [band(str)]
+        Returns:
+            dict(band:dict(album_title(str):album(Album))
         """
-            Gets the album list for the specified band name from the internet.
-            :param band_name the band name.
-            :param country the country of the band. Used for disambiguation.
-            :param style the style of the band. Used also for disambiguation.
+        result = {}
+        for band in band_list:
+            if band.casefold() in cls._valid_albums:
+                band_collection = list(cls._valid_albums[band.casefold()].values())
+                country = band_collection[0].country
+                style = band_collection[0].style
+                try:
+                    releases = cls.get_album_list_for_band(band, country, style)
+                except KeyError:
+                    config.logger.exception(f"Could not find list for band {band}")
+                else:
+                    if releases:
+                        # do casefold for releases, get a set to compare with the releases set later
+                        releases_set = set(map(lambda x: x.casefold(), releases[band].keys()))
+                        # do it for the dict as well to retrieve the album later
+                        releases_lower = {k.casefold():v for k,v in releases[band].items()}
+                        # do casefold for albums in collection
+                        band_collection_low = list(map(lambda album: album.title.casefold(), band_collection))
+                        diff_list = list(releases_set.difference(band_collection_low))
+                        for title in diff_list:
+                            cls._add_album_to_tree(result, band, title, releases_lower[title])
+            else:
+                config.logger.error(f'Band {band} is not in the collection')
+        return result
+
+    @classmethod
+    def get_album_list_for_band(cls, band_name: str, country: str, style: str):
+        """Gets the album list for the specified band name from the internet.
+        Args:
+            band_name(str): the band name.
+            country(str): the country of the band. Used for disambiguation.
+            style(str): the style of the band. Used also for disambiguation.
+        Returns:
+            [(album(str), year(str)]
         """
+        album_dict = {}
         musicbrainzngs.set_useragent("TODO: add name of app", "1.0", "TODO: add EMAIL from settings")
         bands_list = musicbrainzngs.search_artists(artist=band_name, type="group", country=country)
         disambiguation_keywords = style.lower().split()
@@ -599,21 +635,26 @@ class MusicManager:
                                                      includes=["release-groups"],
                                                      release_type=["album", "ep"])
             # let's filter out the compilations
+            # TODO: filter out EPs or add them in type
             release_list = filter(lambda item: (item["type"] != "Compilation"), result["artist"]["release-group-list"])
             album_year_list = []
             for release in release_list:
                 date = release["first-release-date"]
-                year = None
+                year = 1900
                 try:
                     year = date_parser.parse(date).year
                 except ValueError:
-                    config.logger.exception(f"Date {date} could not be parsed")
-                    raise KeyError(f'Date {date} could not be parsed')
-                album_year_list.append((release["title"], year))
+                    config.logger.exception(f'Date {date} for release {release["title"]} could not be parsed')
+                album = Album()
+                # TODO add release type from musibrainz info
+                album.title = release["title"]
+                album.band = band_name
+                album.year = year
+                cls._add_album_to_tree(album_dict, band_name, album.title, album)
 
-            return album_year_list
+            return album_dict
         elif number_of_bands > 1:
-            return "Too many bands with this description", [(band["name"], band["disambiguation"]) for band in
-                                                            filtered_bands]
+            band_list = [(band["name"], band["disambiguation"]) for band in filtered_bands]
+            raise KeyError(f'Too many bands with description "{band_name}:{country}:{style}" : {band_list}')
         else:
-            return f"Could not find the band {band_name} and {country} in musicbrainz"
+            raise KeyError(f"Could not find the band {band_name} and {country} in musicbrainz")

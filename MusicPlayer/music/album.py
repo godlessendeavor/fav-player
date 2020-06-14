@@ -10,9 +10,7 @@ import datetime
 
 
 class Album(DB_album):
-    """
-        This is the model for songs in the Music Player
-    """
+    """This is the model for songs in the Music Player"""
 
     def __init__(self):
         super().__init__()
@@ -57,7 +55,7 @@ class Album(DB_album):
     def validate(self):
         try:
             year = int(self._year)
-        except ValueError:
+        except (ValueError, TypeError):
             config.logger.error(f"Year of album is not an Integer")
             return False
         else:
@@ -68,7 +66,7 @@ class Album(DB_album):
         if self._score and not self._score.isspace():
             try:
                 score = float(self._score)
-            except ValueError:
+            except (ValueError, TypeError):
                 config.logger.error(f"Score of album is not a Float")
                 return False
             else:

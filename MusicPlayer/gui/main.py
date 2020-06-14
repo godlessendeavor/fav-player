@@ -52,6 +52,7 @@ class GUI:
         self._albums_window = None
         self._songs_window = None
         # always initialize layout at the end because it contains the gui main loop
+        self._selected_bands = []
         self._init_main_window_layout()
 
     def _init_main_window_layout(self):
@@ -86,24 +87,20 @@ class GUI:
         self._file_sub_menu.add_command(label="Open", command=self._browse_file)
         self._file_sub_menu.add_command(label="Exit", command=self._window_root.destroy)
         # Create the Albums sub menu            
-        self._file_sub_menu = Menu(self._menu_bar, tearoff=0)
-        self._menu_bar.add_cascade(label="Albums", menu=self._file_sub_menu)
+        self._album_sub_menu = Menu(self._menu_bar, tearoff=0)
+        self._menu_bar.add_cascade(label="Albums", menu=self._album_sub_menu)
         album_list_func = partial(self._execute_thread,
                                   self._get_album_list_thread,
                                   post_function=self._show_album_list)
-        self._file_sub_menu.add_command(label="Open album collection", command=album_list_func)
+        self._album_sub_menu.add_command(label="Open album collection", command=album_list_func)
         album_add_to_db_func = partial(self._execute_thread,
                                        self._add_albums_to_db_thread,
                                        post_function=self._show_album_list)
-        self._file_sub_menu.add_command(label="Add albums from filesystem to DB", command=album_add_to_db_func)
+        self._album_sub_menu.add_command(label="Add albums from filesystem to DB", command=album_add_to_db_func)
         review_add_to_db_func = partial(self._execute_thread,
                                         self._add_reviews_to_db_thread,
                                         post_function=self._show_album_list)
-        self._file_sub_menu.add_command(label="Add reviews from filesystem to DB", command=review_add_to_db_func)
-        add_songs_from_reviews_func = partial(self._execute_thread,
-                                              self._add_songs_from_reviews_thread,
-                                              post_function=self._update_song_list_interactively)
-        self._file_sub_menu.add_command(label="Add songs from reviews", command=add_songs_from_reviews_func)
+        self._album_sub_menu.add_command(label="Add reviews from filesystem to DB", command=review_add_to_db_func)
 
         # create the favorite songs sub menu
         self._songs_sub_menu = Menu(self._menu_bar, tearoff=0)
@@ -112,6 +109,10 @@ class GUI:
                                  self._get_favorites_list_thread,
                                  post_function=self._show_favorites_list)
         self._songs_sub_menu.add_command(label="Open list of favorite songs", command=song_list_func)
+        add_songs_from_reviews_func = partial(self._execute_thread,
+                                              self._add_songs_from_reviews_thread,
+                                              post_function=self._update_song_list_interactively)
+        self._file_sub_menu.add_command(label="Add songs from reviews", command=add_songs_from_reviews_func)
 
         # Create the Play sub menu
         self._play_sub_menu = Menu(self._menu_bar, tearoff=0)
@@ -151,8 +152,8 @@ class GUI:
         self._playlistbox.heading("Album", text="Album", anchor=W)
         self._playlistbox.heading("Length", text="Length")
         self._playlistbox.column("Length", minwidth=0, width=60, anchor=E)
-        self._playlistbox[
-            "show"] = "headings"  # This will remove the first column from the viewer (first column of this widget is the identifier of the row)
+        self._playlistbox["show"] = "headings"  # This will remove the first column from the viewer
+        # (first column of this widget is the identifier of the row)
 
         v_scroll_bar.config(command=self._playlistbox.yview)
         v_scroll_bar.pack(side="right", fill="y")
@@ -285,8 +286,8 @@ class GUI:
             # (first column of this widget is the identifier of the row)
             # add functionality for sorting
             for col in self._album_listbox["columns"]:
-                self._album_listbox.heading(col, text=col, command=lambda _col=col: \
-                    GUI._tree_view_sort_column(self._album_listbox, _col, False))
+                self._album_listbox.heading(col, text=col, command=lambda _col=col:
+                                            GUI._tree_view_sort_column(self._album_listbox, _col, False))
 
             self._album_listbox.column("Band", minwidth=0, width=220)
             self._album_listbox.column("Title", minwidth=0, width=280)
@@ -349,6 +350,12 @@ class GUI:
                     # not an album but a band key, do nothing.
                     pass
 
+            def do_albums_not_in_collection():
+                """Shows a list with the albums not present in the collection."""
+                self._selected_bands = [self._album_listbox.item(band_id)['text'] for band_id in self._album_listbox.selection()]
+                self._execute_thread(self._get_albums_not_in_collection_thread,
+                                     post_function=self._show_albums_not_in_collection)
+
             def do_album_selection(event):
                 """Event on album selection, it will:
                     - Show the cover art from the selected album in _current_album_img
@@ -368,11 +375,11 @@ class GUI:
                         if self._selected_album_review_signature:
                             if self._selected_album_review_signature != get_signature(review):
                                 config.logger.info(
-                                    f"Review for album {self._selected_album.title} has changed. Updating the DB.")
+                                    f'Review for album {self._selected_album.title} has changed. Updating the DB.')
                                 self._selected_album.review = review
                                 try:
                                     MusicManager.update_album(self._selected_album)
-                                except Exception as ex:
+                                except Exception:
                                     config.logger.exception('Could not save album review.')
                                     messagebox.showerror('Error',
                                                          message='Could not save album review. See log for errors.')
@@ -387,13 +394,15 @@ class GUI:
 
                     dim = Dimensions(250, 250)
                     # PhotoImage object must reside in memory
-                    self._current_album_img = CoverArtManager.get_covert_art_for_album(album, self._albums_window, dim)
+                    self._current_album_img = CoverArtManager.get_cover_art_for_album(album, self._albums_window, dim)
                     self._album_work_art_canvas.create_image(20, 20, anchor=NW, image=self._current_album_img)
 
             self._album_list_popup = Menu(self._albums_window, tearoff=0)
             self._album_list_popup.add_command(label="Play album", command=do_album_list_play_album)
             self._album_list_popup.add_command(label="Edit album", command=do_album_edit)
             self._album_list_popup.add_command(label="Delete album", command=do_album_delete)
+            self._album_list_popup.add_command(label="Get list of albums not present in collection",
+                                               command=do_albums_not_in_collection)
 
             # add popup to album_list tree view
             self._album_listbox.bind("<Button-3>", do_album_list_popup)
@@ -448,8 +457,8 @@ class GUI:
             # (first column of this widget is the identifier of the row)
             # add functionality for sorting
             for col in self._song_listbox["columns"]:
-                self._song_listbox.heading(col, text=col, command=lambda _col=col: \
-                    GUI._tree_view_sort_column(self._song_listbox, _col, False))
+                self._song_listbox.heading(col, text=col, command=lambda _col=col:
+                                           GUI._tree_view_sort_column(self._song_listbox, _col, False))
 
             self._song_listbox.column("Band", minwidth=0, width=220)
             self._song_listbox.column("Title", minwidth=0, width=280)
@@ -551,13 +560,16 @@ class GUI:
             else:
                 try:
                     result = self._future.result()
-                except:
+                except Exception:
                     config.logger.exception(f'The execution of thread failed.')
                 else:
                     # append the result from the thread to the post_function arguments
                     if result:
                         args = list(args)
-                        args.extend(result)
+                        if type(result) == list or type(result) == dict:
+                            args.append(result)
+                        else:
+                            args.extend(result)
                     self._progressbar.stop()
                     # call the post function once the thread is finished
                     if post_function:
@@ -637,7 +649,7 @@ class GUI:
             config.logger.exception("Exception when getting favorite songs from the server")
             messagebox.showerror("Error", "Some error while searching for favorites. "
                                           "Please check the connection to the server.")
-        except Exception as ex:
+        except Exception:
             messagebox.showerror("Error",
                                  "Some error while searching for favorites. Please see logging.")
             config.logger.exception("Exception when getting favorite songs from the server")
@@ -646,7 +658,8 @@ class GUI:
 
     def _show_album_list(self, album_dict):
         """Function to be called after the get album list thread
-            @param: album_dict, album dictionary with band as keys and values as a dict of albumes
+        Args:
+             album_dict(dict(str:Album)): album dictionary with band as keys and values as a dict of albumes
         """
         if album_dict:
             self._init_albums_window_layout()
@@ -698,6 +711,20 @@ class GUI:
             raise ex
         else:
             return albums_from_server
+
+    # --------------------------- GET THE ALBUMS NOT IN COLLECTION ----------------------------------------------#
+
+    def _get_albums_not_in_collection_thread(self):
+        """Thread to get a list of the albums of a band not present in the collection."""
+        return MusicManager.get_missing_albums_for_bands(self._selected_bands)
+
+    def _show_albums_not_in_collection(self, albums):
+        """Shows a list with the albums not present in the collection
+        Args:
+            albums(dict(str:Album): the albums dict to show on the list
+        """
+        if albums:
+            self._add_to_album_list(albums)
 
     # --------------------------- GET THE FAVORITES LIST ----------------------------------------------#
 
@@ -887,7 +914,7 @@ class GUI:
                 self._selected_album = None
                 if do_refresh:
                     self._refresh_album_list()
-        except:
+        except Exception:
             config.logger.exception(f"Could not save album with title {album.title}")
             messagebox.showerror('Editor error', f"Could not save album with title {album.title}")
 
@@ -935,8 +962,9 @@ class GUI:
             self.top.destroy()
 
         def choose_path(self):
-            initialdir = self.song.album.path if hasattr(self.song.album, 'path') and self.song.album.path else config.MUSIC_PATH
-            file_name = filedialog.askopenfilenames(initialdir=initialdir, parent=self.top,
+            initial_dir = self.song.album.path if hasattr(self.song.album, 'path') \
+                                                  and self.song.album.path else config.MUSIC_PATH
+            file_name = filedialog.askopenfilenames(initialdir=initial_dir, parent=self.top,
                                                     title=f"Choose file for song {self.song.title} "
                                                           f"from album title {self.song.album.title} "
                                                           f"and band {self.song.album.band}")
@@ -976,7 +1004,7 @@ class GUI:
             try:
                 if old_song != song_window.song:
                     MusicManager.update_song(song_window.song)
-            except:
+            except Exception:
                 config.logger.exception(f"Could not save song with title {song.title}")
                 messagebox.showerror('Editor error', f"Could not save song with title {song.title}")
 
@@ -1028,7 +1056,7 @@ class GUI:
                 # remove the selected album so review is not updated again
                 self._selected_album = None
                 self._refresh_album_list()
-            except:
+            except Exception:
                 config.logger.exception(f"Could not delete album with title {album.title}")
                 messagebox.showerror('Editor error', f"Could not delete album with title {album.title}")
 
@@ -1042,7 +1070,7 @@ class GUI:
                 MusicManager.delete_album(song)
                 self._selected_song = None
                 self._refresh_song_list()
-            except:
+            except Exception:
                 config.logger.exception(f"Could not delete song with title {song.title}")
                 messagebox.showerror('Editor error', f"Could not delete song with title {song.title}")
 
@@ -1207,7 +1235,7 @@ class GUI:
         song.file_name = file_name
         try:
             updated = song.update_song_data_from_file(path_name)
-        except:
+        except Exception:
             config.logger.exception("Failed to add song to the playlist")
         else:
             if updated:
@@ -1227,7 +1255,7 @@ class GUI:
             self._playlist[pl_index] = song
             try:
                 self._player.add_to_playlist(songs=song)
-            except:
+            except Exception:
                 config.logger.exception(f'Could not add song with title {song.title}')
         else:
             config.logger.error(f'There was no song to add to playlist')
@@ -1241,7 +1269,7 @@ class GUI:
         # remove existing tree if there were any items
         try:
             self._album_listbox.delete(*self._album_listbox.get_children())
-        except:
+        except Exception:
             config.logger.warning("Some error when refreshing album list")
 
         band_index = 1
@@ -1294,7 +1322,7 @@ class GUI:
         # remove existing tree if there were any items
         try:
             self._song_listbox.delete(*self._song_listbox.get_children())
-        except:
+        except Exception:
             config.logger.warning("Some error when refreshing favorite songs list")
 
         song_index = 1
@@ -1305,14 +1333,44 @@ class GUI:
             # else:
             #     tags = ('even_row',)
             song_id = self._song_listbox.insert("", song_index, text=song.title,
-                                      values=(song.album.band,
-                                              song.title,
-                                              song.album.title,
-                                              song.score,
-                                              song.file_name,
-                                              song.available))
+                                                values=(song.album.band,
+                                                        song.title,
+                                                        song.album.title,
+                                                        song.score,
+                                                        song.file_name,
+                                                        song.available))
             # , tags=tags)
             self._songs_list[song_id] = song
+
+    def _add_to_favorites_list(self, song_list):
+        """Add input dict to song tree view
+        Args:
+            song_list (list): the dict of songs to add to the song list.
+        """
+
+        # remove existing tree if there were any items
+        try:
+            self._song_listbox.delete(*self._song_listbox.get_children())
+        except Exception:
+            config.logger.warning("Some error when refreshing favorite songs list")
+
+        song_index = 1
+        for song in sorted(song_list, key=lambda song_from_list: song_from_list.album.band):
+            # add tags for identifying which background color to apply
+            # if song_index % 2:
+            #     tags = ('odd_row',)
+            # else:
+            #     tags = ('even_row',)
+            song_id = self._song_listbox.insert("", song_index, text=song.title,
+                                                values=(song.album.band,
+                                                        song.title,
+                                                        song.album.title,
+                                                        song.score,
+                                                        song.file_name,
+                                                        song.available))
+            # , tags=tags)
+            self._songs_list[song_id] = song
+
 
     def _refresh_album_list(self):
         """Refreshes the album list."""
@@ -1345,16 +1403,15 @@ class GUI:
             @param: col, the column to sort
             @param: reverse, parameter to specify if it has to be sorted in reverse.        
         """
-        l = [(treeview.set(k, col), k) for k in treeview.get_children('')]
-        l.sort(reverse=reverse)
+        list_view = [(treeview.set(k, col), k) for k in treeview.get_children('')]
+        list_view.sort(reverse=reverse)
 
         # rearrange items in sorted positions
-        for index, (val, k) in enumerate(l):
+        for index, (val, k) in enumerate(list_view):
             treeview.move(k, '', index)
 
         # reverse sort next time
-        treeview.heading(col, command=lambda: \
-            GUI._tree_view_sort_column(treeview, col, not reverse))
+        treeview.heading(col, command=lambda: GUI._tree_view_sort_column(treeview, col, not reverse))
 
 
 if __name__ == '__main__':
