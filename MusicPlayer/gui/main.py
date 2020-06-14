@@ -54,9 +54,6 @@ class GUI:
         # always initialize layout at the end because it contains the gui main loop
         self._init_main_window_layout()
 
-    # TODO: create a window for getting all favorites and be able to update and delete
-    # do it in the fashion of a treeview like the albums and with the albums as root
-
     def _init_main_window_layout(self):
         """
             Initializes the main window layout

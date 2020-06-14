@@ -6,7 +6,7 @@ Created on Dec 3, 2019
 import difflib
 from functools import reduce, lru_cache
 import os
-from os.path import relpath
+from os.path import relpath, exists
 import dateutil.parser as date_parser
 import logging
 import re
@@ -321,8 +321,9 @@ class MusicManager:
             # initialize dictionary to store the directory tree
             dir_tree = {}
             root_dir = cls._collection_root.rstrip(os.sep)  # remove leading whitespaces
+            if not exists(root_dir):
+                raise Exception(f'Collection directory {root_dir} does not exist')
             config.logger.debug(f'Getting music directory tree from {root_dir}')
-            # TODO: check if directory exists, throw exception if not
             # recipe for getting the directory tree
             start = root_dir.rfind(os.sep) + 1  # get the index for the name of the folder
             for path, dirs, files in os.walk(root_dir):
@@ -466,7 +467,8 @@ class MusicManager:
                     for album in albums_dict[band_key].values():
                         if album.id == db_song.album.id:
                             found_album = True
-                            song.album = Album().merge(album)
+                            song.album = Album()
+                            song.album.merge(album)
                             found_song = False
                             if song.file_name:
                                 abs_path = os.path.join(album.path, song.file_name)
