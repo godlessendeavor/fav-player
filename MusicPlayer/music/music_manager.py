@@ -605,6 +605,8 @@ class MusicManager:
             band_name(str): the band name.
             country(str): the country of the band. Used for disambiguation.
             style(str): the style of the band. Used also for disambiguation.
+        Raises:
+            KeyError: if no match for the given arguments has been found in the databases
         Returns:
             [(album(str), year(str)]
         """
@@ -637,7 +639,6 @@ class MusicManager:
             # let's filter out the compilations
             # TODO: filter out EPs or add them in type
             release_list = filter(lambda item: (item["type"] != "Compilation"), result["artist"]["release-group-list"])
-            album_year_list = []
             for release in release_list:
                 date = release["first-release-date"]
                 year = 1900
@@ -646,10 +647,10 @@ class MusicManager:
                 except ValueError:
                     config.logger.exception(f'Date {date} for release {release["title"]} could not be parsed')
                 album = Album()
-                # TODO add release type from musibrainz info
                 album.title = release["title"]
                 album.band = band_name
                 album.year = year
+                album.type = release["type"]
                 cls._add_album_to_tree(album_dict, band_name, album.title, album)
 
             return album_dict

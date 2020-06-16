@@ -112,7 +112,7 @@ class GUI:
         add_songs_from_reviews_func = partial(self._execute_thread,
                                               self._add_songs_from_reviews_thread,
                                               post_function=self._update_song_list_interactively)
-        self._file_sub_menu.add_command(label="Add songs from reviews", command=add_songs_from_reviews_func)
+        self._songs_sub_menu.add_command(label="Add songs from reviews", command=add_songs_from_reviews_func)
 
         # Create the Play sub menu
         self._play_sub_menu = Menu(self._menu_bar, tearoff=0)
@@ -763,14 +763,17 @@ class GUI:
             all_songs = valid_songs
             all_songs.extend(wrong_songs)
             self._add_to_favorites_list(all_songs)
+        else:
+            messagebox.showerror("Error", "Error getting favorites list. Please check logging.")
+        # if there were wrong songs let the user decide if they need to be edited
+        if len(wrong_songs) > 0:
             edit_question_window = self.SongEditQuestionWindow(self._window_root, len(wrong_songs))
             self._window_root.wait_window(edit_question_window.top)
             if edit_question_window.edit:
                 for song in wrong_songs:
                     self._edit_song(song)
             self.status_bar['text'] = 'Song list ready'
-        else:
-            messagebox.showerror("Error", "Error getting favorites list. Please check logging.")
+
 
     def _get_favorites_list_thread(self):
         """Thread to get the song list from the collection and database."""
@@ -969,8 +972,12 @@ class GUI:
                                                           f"from album title {self.song.album.title} "
                                                           f"and band {self.song.album.band}")
             if file_name:
-                diff_path = relpath(file_name[0], self.song.album.path)
-                config.logger.info(f"Setting file name from {self.song.file_name} to {diff_path}")
+                if self.song.album.path:
+                    diff_path = relpath(file_name[0], self.song.album.path)
+                    config.logger.info(f"Setting file name from {self.song.file_name} to {diff_path}")
+                else:
+                    diff_path = file_name[0]
+                    config.logger.warning(f"Album has not path. Setting file name from {self.song.file_name} to {diff_path}")
                 self.song.abs_path = file_name[0]
                 self.song.file_name = diff_path
                 return self.song
@@ -997,6 +1004,7 @@ class GUI:
         Arguments:
             song(Song): the song to update
         """
+        #TODO: why albums at this point have no path? when calling get_favorites they have the correct path
         old_song = copy.deepcopy(song)
         song_window = self.SongEditWindow(self._window_root, song, self._edit_album)
         self._window_root.wait_window(song_window.top)
