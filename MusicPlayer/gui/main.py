@@ -150,8 +150,6 @@ class GUI:
 
         self._songs_sub_menu.add_command(label="Create playlist from favorites", command=self._create_playlist_from_favorites)
 
-
-
         # Create the Play sub menu
         self._play_sub_menu = Menu(self._menu_bar, tearoff=0)
         self._menu_bar.add_cascade(label="Play", menu=self._play_sub_menu)
@@ -198,7 +196,7 @@ class GUI:
 
         self._playlistbox.pack(side="left", fill="y", expand=True)
 
-        # PLAYLIST POUP
+        # PLAYLIST POPUP
         self._playlist_popup = Menu(self._window_root, tearoff=0)
         self._playlist_popup.add_command(label="Add song to favorites", command=self._playlist_box_add_to_favorites)
         self._playlist_popup.add_separator()
@@ -206,7 +204,7 @@ class GUI:
         self._playlist_popup.selection = None
 
         def do_playlist_popup(event):
-            # display the _playlist_popup menu
+            """display the _playlist_popup menu"""
             try:
                 self._playlist_popup.selection = self._playlistbox.identify_row(event.y)
                 self._playlist_popup.post(event.x_root, event.y_root)
@@ -215,9 +213,7 @@ class GUI:
                 self._playlist_popup.grab_release()
 
         def do_playlist_play_song(event):
-            """    
-                Play item on double click.
-            """
+            """Play item on double click."""
             row = self._playlistbox.identify_row(event.y)
             self._play_music([(self._playlist[str(row)])])
 
@@ -640,9 +636,7 @@ class GUI:
     # ----------------------- GET FAVORITE SONGS ---------------------------------------------#
 
     class FavoritesScoreWindow(object):
-        """
-            Window for asking the score for favorite songs
-        """
+        """Window for asking the score for favorite songs"""
 
         def __init__(self, master, message):
             top = self.top = Toplevel(master)
@@ -660,7 +654,7 @@ class GUI:
 
     def _get_score_input(self, message):
         """Function helper to open a window to ask the user for giving the score to an album or a song.
-        Arguments:
+        Args:
             message(str): the message to show in the window, related to the item to give a score for.
         Returns:
             the score given from the user
@@ -901,7 +895,7 @@ class GUI:
     # --------------- MAIN PLAYER ---------------#
 
     def _playlist_box_add_to_favorites(self):
-        """ Adds the selected song from the playlist to the favorites in the server."""
+        """Adds the selected song from the playlist to the favorites in the server."""
         song = self._playlist[self._playlist_popup.selection]
         score = self._get_score_input(f"Give the score for the current song {song.title}"
                                       f" with current score {song.score}")
@@ -916,7 +910,7 @@ class GUI:
     # ----------------------- MENU ACTION HELPERS -------------------------------------------#
 
     class AlbumEditWindow(object):
-        """ Window for editing album fields."""
+        """Window for editing album fields."""
 
         def __init__(self, master, album):
             top = self.top = Toplevel(master)
@@ -978,7 +972,7 @@ class GUI:
             It will open a window to edit the different fields for the given album.
             If user clicks save the album will be updated by calling the MusicManager.
             After the album is saved the albums_window will be refreshed.
-        Arguments:
+        Args:
             album(Album): the album to edit
             do_refresh(bool): indicates if the album list should be refreshed
         """
@@ -997,7 +991,7 @@ class GUI:
             messagebox.showerror('Editor error', f"Could not save album with title {album.title}")
 
     class SongEditWindow(object):
-        """ Window for editing song fields."""
+        """Window for editing song fields."""
 
         def __init__(self, master, song, edit_album_func):
             self.canceled = False
@@ -1091,7 +1085,7 @@ class GUI:
                 messagebox.showerror('Editor error', f"Could not save song with title {song.title}")
 
     class DeleteQuestionWindow(object):
-        """ Window for editing album fields."""
+        """Window for editing album fields."""
 
         def __init__(self, master, item_name):
             top = self.top = Toplevel(master)
@@ -1159,8 +1153,7 @@ class GUI:
     ##-------------------------------BUTTONS ACTIONS---------------------------------------------------###
 
     def _play_music(self, song_list=None):
-        """
-            Plays the list of songs from the playlistbox. 
+        """Plays the list of songs from the playlistbox.
             It will start on the selected song from the playlist.
         """
         if self._paused and not song_list:
@@ -1188,17 +1181,13 @@ class GUI:
                 self.status_bar['text'] = "Music playing"
 
     def _stop_music(self):
-        """
-            Stops playing music.
-        """
+        """Stops playing music."""
         self._player.stop()
         self._stop_details_thread = True
         self.status_bar['text'] = "Music stopped"
 
     def _pause_music(self):
-        """
-            Pauses the music in the current playing song.
-        """
+        """Pauses the music in the current playing song."""
         self._player.pause()
         if self._paused:
             self._paused = FALSE
@@ -1208,15 +1197,11 @@ class GUI:
             self.status_bar['text'] = "Music paused"
 
     def _set_volume(self, volume):
-        """
-            Sets the volume of the player.
-        """
+        """Sets the volume of the player."""
         self._player.set_volume(volume)
 
     def _mute_music(self):
-        """
-            Toggles the player sound.
-        """
+        """Toggles the player sound."""
         if self._muted:  # Unmute the music
             self._player.set_volume(1)
             self._volume_button.configure(image=self._volume_photo)
@@ -1245,8 +1230,7 @@ class GUI:
     # ------------------------- GUI EVENTS ------------------------------------------#
 
     def _on_closing(self):
-        """
-            Event called on closing the main window.
+        """Event called on closing the main window.
             It will stop the music and destroy any existing window.
         """
         self._stop_music()
@@ -1256,8 +1240,7 @@ class GUI:
         self._window_root.destroy()
 
     def _on_closing_album_window(self):
-        """
-           Event called on albums window closure.
+        """Event called on albums window closure.
            It will save the latest modified review if any.
         """
         if hasattr(self, '_selected_album') and self._selected_album:
@@ -1295,9 +1278,7 @@ class GUI:
     # ------------------------ PLAYER EVENTS  -----------------------------------------#
 
     def _player_song_started_event(self):
-        """
-            Event called when a song is started
-        """
+        """Event called when a song is started"""
         song = self._player.get_current_song()
         if song:
             self.status_bar['text'] = f'Playing: {song.title}'
@@ -1459,8 +1440,7 @@ class GUI:
 
     @staticmethod
     def _tree_view_sort_column(treeview, col, reverse):
-        """
-            Function to sort the columns of a treeview when headings are clicked.
+        """Function to sort the columns of a treeview when headings are clicked.
             @param: treeview, the treeview to sort
             @param: col, the column to sort
             @param: reverse, parameter to specify if it has to be sorted in reverse.        
