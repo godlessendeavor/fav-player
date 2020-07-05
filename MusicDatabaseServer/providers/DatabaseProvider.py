@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 # set database configuration
 database = MySQLDatabase(config.DATABASE_NAME,
-                         **{'charset': 'utf8',
+                         **{'charset': 'utf8mb4',
                             'sql_mode': 'PIPES_AS_CONCAT',
                             'use_unicode': True,
                             'host': config.DATABASE_HOST,
@@ -89,8 +89,9 @@ class DatabaseProvider(object):
         return [row for row in result.dicts()]
 
     def _get_album_for_song(self, song):
-        """
-            Fills in the album info for a given song
+        """Fills in the album info for a given song
+        Args:
+            song(dict): the song to fill the info for
         """
         if song and song['album_id']:
             album_list, result = self.get_albums(None, song['album_id'])
@@ -105,28 +106,41 @@ class DatabaseProvider(object):
             return None
 
     @database_mgmt
-    def get_songs(self, quantity, score):
-        """
-            Get songs from the favorites table by quantity and score
+    def get_songs(self, quantity=None, score=None):
+        """Get songs from the favorites table by quantity and score
+        Args:
+            quantity(int): limit of songs to retrieve
+            score(float): minimum score of songs to retrieve (Values are from 0 to 10, but no validation is done here)
+        Returns:
+            dict: with 'songs' as key and the song list as value
         """
         # get result from database as Peewee model
-        if quantity:
+        if quantity and score:
             result = Favorites.select() \
                 .where(Favorites.score > score) \
                 .order_by(fn.Rand()).limit(int(quantity))
+        elif quantity:
+            result = Favorites.select() \
+                .order_by(fn.Rand()).limit(int(quantity))
+        elif score:
+            result = Favorites.select() \
+                .where(Favorites.score > score)
         else:
             result = Favorites.select()
         # No, I will not do a JOIN. Some column names are the same in both tables (title for example)
         # The simple Join query on Peewee will override those names
         # That means that every column with shared name has to be given an alias and then map back to the
-        # corresponding model. A bit too much and I'm not worried about efficiency here
+        # corresponding model. A bit too much effort and not clean. I'm not worried about efficiency here
         list_result = [song for song in result.dicts() if self._get_album_for_song(song)]
         logger.debug('Getting result for get_songs: %s', list_result)
         return {'songs': list_result}
 
     @database_mgmt
     def create_song(self, song):
-        """Creates a song on the favorites table."""
+        """Creates a song on the favorites table.
+        Args:
+            song(dict): the song to add to the table.
+        """
         if song:
             fav = Favorites()
             # first copy compulsory fields and validate types
@@ -168,16 +182,18 @@ class DatabaseProvider(object):
             return None, 400
 
     @database_mgmt
-    def update_song(self, song) -> str:
-        """
-            Updates an existing song in the favorites table. Creates it if not existing.
+    def update_song(self, song):
+        """Updates an existing song in the favorites table. Creates it if not existing.
+        Args:
+            song(dict): the song to update
         """
         return self.create_song(song)
 
     @database_mgmt
-    def delete_song(self, song_id) -> str:
-        """
-            Deletes a song from the favorites table.
+    def delete_song(self, song_id):
+        """Deletes a song from the favorites table.
+        Args:
+            song_id(int): the song id to delete
         """
         fav = Favorites.get(Favorites.id == song_id)
         try:
@@ -188,7 +204,13 @@ class DatabaseProvider(object):
         return song_id, 200
 
     @database_mgmt
-    def get_albums(self, quantity, album_id) -> str:
+    def get_albums(self, quantity, album_id):
+        """Gets an album from the album id.
+        If not provided and quantity is given then it will get a random list of albums limited by quantity.
+        Args:
+            quantity(int): the number of albums to retrieve
+            album_id(int): the id of the album to retrieve
+        """
         # TODO: get album list if album_id is a list
         if album_id:
             result = Album.select().where(Album.id == album_id)
