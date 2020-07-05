@@ -59,13 +59,26 @@ class Song(DB_song):
     def abs_path(self):
         return self._abs_path
 
+    # TODO: remove the setter and call the function below
     @abs_path.setter
     def abs_path(self, path):
         try:
             self.update_song_data_from_file(path)
             self._abs_path = path
-        except:
+        except Exception:
             config.logger.exception(f'Could not set absolute path for song in {path}')
+
+    def set_abs_path(self, path, check_file=False):
+        """A setter for the abs_path where we give the option to choose to check the file or not.
+        Args:
+            path(str): the song absolute path
+            check_file(bool): a boolean indicating if the MP3 tags should be retrieved or not
+        """
+        if check_file:
+            # calls the setter which by default retrieves the tags
+            self.abs_path = path
+        else:
+            self._abs_path = path
 
     def validate(self):
         """Validates the attributes of this instance.
@@ -140,6 +153,7 @@ class Song(DB_song):
                     except Exception:
                         config.logger.exception(f"Some exception occurred while reading MP3 tags for {song_path}.")
                     else:
+                        # TODO: do we really want to overwrite the band, album and title from the collection?
                         if not self._band and 'artist' in tagsv2:
                             self._band = tagsv2['artist']
                         if not self._album and 'album' in tagsv2:

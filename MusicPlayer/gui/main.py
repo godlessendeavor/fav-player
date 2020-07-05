@@ -24,10 +24,35 @@ from music.cover_art_manager import CoverArtManager, Dimensions
 
 
 def get_signature(contents):
-    """
-        Function to get the MD5 hash of the given string. Useful for checking if changes have been made to a string.
+    """Function to get the MD5 hash of the given string. Useful for checking if changes have been made to a string.
     """
     return hashlib.md5(str(contents).encode()).digest()
+
+
+class UIThreadExecutor(object):
+    """Helper class for thread execution"""
+
+    def __init__(self):
+        self.target_thread = None
+        self.target_args = None
+        self.target_kwargs = None
+        self.post_function = None
+        self.post_function_args = None
+        self.post_function_kwargs = None
+
+    def set_target_function(self, target_thread, *args, **kwargs):
+        self.target_thread = target_thread
+        if args:
+            self.target_args = args
+        if kwargs:
+            self.target_kwargs = kwargs
+
+    def set_post_function(self, post_function, *args, **kwargs):
+        self.post_function = post_function
+        if args:
+            self.post_function_args = args
+        if kwargs:
+            self.post_function_kwargs = kwargs
 
 
 class GUI:
@@ -86,33 +111,46 @@ class GUI:
         self._menu_bar.add_cascade(label="File", menu=self._file_sub_menu)
         self._file_sub_menu.add_command(label="Open", command=self._browse_file)
         self._file_sub_menu.add_command(label="Exit", command=self._window_root.destroy)
+
         # Create the Albums sub menu            
         self._album_sub_menu = Menu(self._menu_bar, tearoff=0)
         self._menu_bar.add_cascade(label="Albums", menu=self._album_sub_menu)
-        album_list_func = partial(self._execute_thread,
-                                  self._get_album_list_thread,
-                                  post_function=self._show_album_list)
+        album_list_executor = UIThreadExecutor()
+        album_list_executor.set_target_function(self._get_album_list_thread)
+        album_list_executor.set_post_function(self._show_album_list)
+        album_list_func = partial(self._execute_thread, album_list_executor)
         self._album_sub_menu.add_command(label="Open album collection", command=album_list_func)
-        album_add_to_db_func = partial(self._execute_thread,
-                                       self._add_albums_to_db_thread,
-                                       post_function=self._show_album_list)
+
+        album_add_to_db_executor = UIThreadExecutor()
+        album_add_to_db_executor.set_target_function(self._add_albums_to_db_thread)
+        album_add_to_db_executor.set_post_function(self._show_album_list)
+        album_add_to_db_func = partial(self._execute_thread, album_add_to_db_executor)
         self._album_sub_menu.add_command(label="Add albums from filesystem to DB", command=album_add_to_db_func)
-        review_add_to_db_func = partial(self._execute_thread,
-                                        self._add_reviews_to_db_thread,
-                                        post_function=self._show_album_list)
+
+        review_add_to_db_executor = UIThreadExecutor()
+        review_add_to_db_executor.set_target_function(self._add_reviews_to_db_thread)
+        review_add_to_db_executor.set_post_function(self._show_album_list)
+        review_add_to_db_func = partial(self._execute_thread, review_add_to_db_executor)
         self._album_sub_menu.add_command(label="Add reviews from filesystem to DB", command=review_add_to_db_func)
 
         # create the favorite songs sub menu
         self._songs_sub_menu = Menu(self._menu_bar, tearoff=0)
         self._menu_bar.add_cascade(label="Songs", menu=self._songs_sub_menu)
-        song_list_func = partial(self._execute_thread,
-                                 self._get_favorites_list_thread,
-                                 post_function=self._show_favorites_list)
-        self._songs_sub_menu.add_command(label="Open list of favorite songs", command=song_list_func)
-        add_songs_from_reviews_func = partial(self._execute_thread,
-                                              self._add_songs_from_reviews_thread,
-                                              post_function=self._update_song_list_interactively)
+        list_favorite_songs_executor = UIThreadExecutor()
+        list_favorite_songs_executor.set_target_function(self._get_favorites_list_thread)
+        list_favorite_songs_executor.set_post_function(self._show_favorites_list)
+        list_favorite_songs_func = partial(self._execute_thread, list_favorite_songs_executor)
+        self._songs_sub_menu.add_command(label="Open list of favorite songs", command=list_favorite_songs_func)
+
+        add_songs_from_reviews_executor = UIThreadExecutor()
+        add_songs_from_reviews_executor.set_target_function(self._add_songs_from_reviews_thread)
+        add_songs_from_reviews_executor.set_post_function(self._update_song_list_interactively)
+        add_songs_from_reviews_func = partial(self._execute_thread, add_songs_from_reviews_executor)
         self._songs_sub_menu.add_command(label="Add songs from reviews", command=add_songs_from_reviews_func)
+
+        self._songs_sub_menu.add_command(label="Create playlist from favorites", command=self._create_playlist_from_favorites)
+
+
 
         # Create the Play sub menu
         self._play_sub_menu = Menu(self._menu_bar, tearoff=0)
@@ -353,8 +391,10 @@ class GUI:
             def do_albums_not_in_collection():
                 """Shows a list with the albums not present in the collection."""
                 self._selected_bands = [self._album_listbox.item(band_id)['text'] for band_id in self._album_listbox.selection()]
-                self._execute_thread(self._get_albums_not_in_collection_thread,
-                                     post_function=self._show_albums_not_in_collection)
+                thread_executor = UIThreadExecutor()
+                thread_executor.set_target_function(self._get_albums_not_in_collection_thread)
+                thread_executor.set_post_function(self._show_albums_not_in_collection)
+                self._execute_thread(thread_executor)
 
             def do_album_selection(event):
                 """Event on album selection, it will:
@@ -526,14 +566,15 @@ class GUI:
     # ------------------ TASKS EXECUTION -----------------------------------------------------#
     # ------------------ TASKS EXECUTION -----------------------------------------------------#
 
-    def _execute_thread(self, target_thread, post_function=None, *post_function_args):
-        """
-            Function execute tasks in parallel with the GUI main loop.
+    def _execute_thread(self, thread_executor):
+        """Function execute tasks in parallel with the GUI main loop.
             It will start a new thread passed on target_thread and a progressbar to indicate progress
             Progress update is checked in _check_thread
-            @post_function: function to be called after the thread is finished. Generally a GUI update.
-            @post_function_args: arguments for the post function.
+        Args:
+            thread_executor(UIThreadExecutor): object to get target thread, post function and the corresponding args
             NOTE: any result of the function thread will be passed as last argument to the post function
+            NOTE: do not execute any UI update code in the thread. Any UI update code needs to be executed in the
+            post_function which will be in the UI main loop.
         """
         if self._future:
             if self._future.running():
@@ -544,9 +585,18 @@ class GUI:
 
         self._progressbar.start()
         executor = ThreadPoolExecutor(max_workers=2)
-        self._future = executor.submit(target_thread)
+        if thread_executor.target_args and thread_executor.target_kwargs:
+            self._future = executor.submit(thread_executor.target_thread, thread_executor.target_args,
+                                           thread_executor.target_kwargs)
+        elif thread_executor.target_kwargs:
+            self._future = executor.submit(thread_executor.target_thread, **thread_executor.target_kwargs)
+        else:
+            self._future = executor.submit(thread_executor.target_thread)
 
-        self._window_root.after(100, self._check_thread, post_function, *post_function_args)
+        if thread_executor.post_function_args:
+            self._window_root.after(100, self._check_thread, thread_executor.post_function, thread_executor.post_function_args)
+        else:
+            self._window_root.after(100, self._check_thread, thread_executor.post_function)
 
     def _check_thread(self, post_function, *args):
         """Function to check progress of a thread. It updates a progress bar while working.
@@ -563,16 +613,16 @@ class GUI:
                 except Exception:
                     config.logger.exception(f'The execution of thread failed.')
                 else:
-                    # append the result from the thread to the post_function arguments
-                    if result:
-                        args = list(args)
-                        if type(result) == list or type(result) == dict:
-                            args.append(result)
-                        else:
-                            args.extend(result)
                     self._progressbar.stop()
                     # call the post function once the thread is finished
                     if post_function:
+                        # append the result from the thread to the post_function arguments
+                        if result:
+                            args = list(args)
+                            if type(result) == list or type(result) == dict:
+                                args.append(result)
+                            else:
+                                args.extend(result)
                         post_function(*args)
 
     # ----------------- MENU ACTIONS ----------------------------------------------------#
@@ -634,7 +684,10 @@ class GUI:
         """Function to play the favorite songs"""
         self._favorites_score = self._get_score_input("Please give the minimum score of songs to play")
         if self._favorites_score:
-            self._execute_thread(self._search_favorites_thread, self._play_music)
+            thread_executor = UIThreadExecutor()
+            thread_executor.set_target_function(self._search_favorites_thread)
+            thread_executor.set_post_function(self._play_music)
+            self._execute_thread(thread_executor)
 
     def _search_favorites_thread(self):
         """Thread to search favorite songs and add to the playlist"""
@@ -774,7 +827,6 @@ class GUI:
                     self._edit_song(song)
             self.status_bar['text'] = 'Song list ready'
 
-
     def _get_favorites_list_thread(self):
         """Thread to get the song list from the collection and database."""
         self.status_bar['text'] = 'Getting song list'
@@ -785,6 +837,29 @@ class GUI:
             raise ex
         else:
             return valid_songs, wrong_songs
+
+    # --------------------------- CREATE FAVORITES PLAYLIST ----------------------------------------------#
+
+    def _create_playlist_from_favorites(self):
+        """Creates a favorites playlist file for a score asking the user"""
+        playlist_dir = filedialog.askdirectory(initialdir=config.MUSIC_PATH, parent=self._window_root,
+                                               title=f"Choose playlist path")
+        if playlist_dir:
+            favorites_score = self._get_score_input("Please give the minimum score of songs to play")
+            if favorites_score:
+                thread_executor = UIThreadExecutor()
+                thread_executor.set_target_function(self.create_favorites_playlist_thread, score=favorites_score,
+                                                    playlist_dir=playlist_dir)
+                self._execute_thread(thread_executor)
+
+    def create_favorites_playlist_thread(self, **kwargs):
+        """Creates a favorites playlist thread
+        Args:
+            kwargs: with the following elements
+                - score(float): the minimum score for the favorites to add.
+                - playlist_dir(str): the path to store the playlist in
+        """
+        MusicManager.create_favorites_playlist(score=kwargs['score'], file_path=kwargs['playlist_dir'])
 
     # --------------------------- UPDATE REVIEWS ----------------------------------------------#
 
@@ -838,7 +913,7 @@ class GUI:
                 config.logger.exception(f'Error adding new favorite song.')
                 messagebox.showerror("Error", "Error adding a new favorite song. Please check logging.")
 
-    # ----------------------- BUTTONS ACTIONS -------------------------------------------#
+    # ----------------------- MENU ACTION HELPERS -------------------------------------------#
 
     class AlbumEditWindow(object):
         """ Window for editing album fields."""
@@ -1004,7 +1079,6 @@ class GUI:
         Arguments:
             song(Song): the song to update
         """
-        #TODO: why albums at this point have no path? when calling get_favorites they have the correct path
         old_song = copy.deepcopy(song)
         song_window = self.SongEditWindow(self._window_root, song, self._edit_album)
         self._window_root.wait_window(song_window.top)
@@ -1081,6 +1155,8 @@ class GUI:
             except Exception:
                 config.logger.exception(f"Could not delete song with title {song.title}")
                 messagebox.showerror('Editor error', f"Could not delete song with title {song.title}")
+
+    ##-------------------------------BUTTONS ACTIONS---------------------------------------------------###
 
     def _play_music(self, song_list=None):
         """
@@ -1227,12 +1303,14 @@ class GUI:
             self.status_bar['text'] = f'Playing: {song.title}'
 
     def _player_playlist_finished_event(self):
-        """
-            Event called when the playlist is finished. 
+        """Event called when the playlist is finished.
             It will call more favorite songs to play.
         """
         if self._favorites_score:
-            self._execute_thread(self._search_favorites_thread, post_function=self._play_music)
+            thread_executor = UIThreadExecutor()
+            thread_executor.set_target_function(self._search_favorites_thread)
+            thread_executor.set_post_function(self._play_music)
+            self._execute_thread(thread_executor)
 
     # -------------------- FUNCTION HELPERS  ------------------------------------##
 
@@ -1350,44 +1428,20 @@ class GUI:
             # , tags=tags)
             self._songs_list[song_id] = song
 
-    def _add_to_favorites_list(self, song_list):
-        """Add input dict to song tree view
-        Args:
-            song_list (list): the dict of songs to add to the song list.
-        """
-
-        # remove existing tree if there were any items
-        try:
-            self._song_listbox.delete(*self._song_listbox.get_children())
-        except Exception:
-            config.logger.warning("Some error when refreshing favorite songs list")
-
-        song_index = 1
-        for song in sorted(song_list, key=lambda song_from_list: song_from_list.album.band):
-            # add tags for identifying which background color to apply
-            # if song_index % 2:
-            #     tags = ('odd_row',)
-            # else:
-            #     tags = ('even_row',)
-            song_id = self._song_listbox.insert("", song_index, text=song.title,
-                                                values=(song.album.band,
-                                                        song.title,
-                                                        song.album.title,
-                                                        song.score,
-                                                        song.file_name,
-                                                        song.available))
-            # , tags=tags)
-            self._songs_list[song_id] = song
-
-
     def _refresh_album_list(self):
         """Refreshes the album list."""
-        self._execute_thread(self._get_album_list_thread, post_function=self._add_to_album_list)
+        thread_executor = UIThreadExecutor()
+        thread_executor.set_target_function(self._get_album_list_thread)
+        thread_executor.set_post_function(self._add_to_album_list)
+        self._execute_thread(thread_executor)
         self.status_bar['text'] = 'Album list ready'
 
     def _refresh_song_list(self):
         """Refreshes the song list."""
-        self._execute_thread(self._get_favorites_list_thread, post_function=self._add_to_favorites_list)
+        thread_executor = UIThreadExecutor()
+        thread_executor.set_target_function(self._get_favorites_list_thread)
+        thread_executor.set_post_function(self._add_to_favorites_list)
+        self._execute_thread(thread_executor)
         self.status_bar['text'] = 'Song list ready'
 
     def _show_details(self):

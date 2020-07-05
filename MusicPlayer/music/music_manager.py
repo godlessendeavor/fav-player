@@ -144,19 +144,39 @@ class MusicManager:
             return cls._get_songs_in_fs(result.songs)
 
     @classmethod
-    def get_favorites(cls, ids=None, check_collection=False):
+    def create_favorites_playlist(cls, score=None, file_path=None):
+        """Creates a m3u playlist of all favorite songs above a score
+        Args:
+            score(float): the minimum score of the songs to create the playlist for
+            file_path(str): the target location of the playlist
+        """
+        if not file_path:
+            config.logger.warning("File path for m3u list was not provided")
+        else:
+            song_list, _ = cls.get_favorites(check_collection=True, score=score)
+            if song_list:
+                _m3u = open(os.path.join(file_path,"playlist_" + str(score) + ".m3u"), "w")
+                for song in song_list:
+                    song_path = relpath(song.abs_path, cls._collection_root)
+                    _m3u.write(song_path + "\n")
+                _m3u.close()
+
+    @classmethod
+    def get_favorites(cls, ids=None, check_collection=False, score=None):
         """Gets a list of favorite songs from the database and collection from the given ids.
         If no ids are given it will return all favorites.
         Args:
            ids([int]): The database ids of requested favorite songs.
            check_collection(bool): indicates if the file system should be checked(True) or not(False).
+           score(float): minimum score of songs to search
         Returns:
             ([Song], [Song]): tuple of :
                 list of favorite songs that matches the arguments specified
-                list of invalid songs that do fail to run validation check
+                list of invalid songs that fail to run the Song validation
         """
+        # TODO: create the interface to retrieve by ids on the server and complete it here
         try:
-            result = cls._music_db.api_songs_get_songs()
+            result = cls._music_db.api_songs_get_songs(score=score)
         except Exception as ex:
             config.logger.exception('Exception when getting favorite songs')
             raise ex
@@ -343,6 +363,17 @@ class MusicManager:
             res_tree = val
         return res_tree
 
+    @staticmethod
+    def _check_path_in_music_tree(tree_dict, keys):
+        """Recursively check a file path in the given dictionary.
+        The main purpose for this is to verify existence of files in the music directory tree.
+        Args:
+            keys(list): the file path split in a list of keys to access the dictionary
+        """
+        if len(keys) == 1:
+            return tree_dict[keys[0]]
+        return MusicManager._check_path_in_music_tree(tree_dict[keys[0]], keys[1:])
+
     @classmethod
     def _add_album_to_tree(cls, tree, band_key, album_key, album=None):
         """Adds an album to a tree.
@@ -451,6 +482,7 @@ class MusicManager:
         Returns:
             list with the songs that exist on the file system
         """
+
         existing_songs = []
         wrong_songs = []
         if not isinstance(song_list, list):
@@ -458,6 +490,10 @@ class MusicManager:
         else:
             # get albums from collection to search for this song list
             albums_dict, _, _ = cls._update_albums_from_collection()
+            # get the music directory tree all at once.
+            # When checking for existence of a song file it's more efficient
+            music_file_tree = cls._get_music_directory_tree()
+
             # for every song in the database result search the album info in the database
             for db_song in song_list:
                 # if it's the same band then we continue, otherwise there might be a mistake
@@ -475,8 +511,12 @@ class MusicManager:
                             found_song = False
                             if song.file_name:
                                 abs_path = os.path.join(album.path, song.file_name)
-                                if os.path.isfile(abs_path):
-                                    song.abs_path = abs_path
+                                file_path, song_file_name = os.path.split(abs_path)
+                                relative_path = relpath(file_path, cls._collection_root)
+                                relative_path = relative_path.split('/')
+                                files = cls._check_path_in_music_tree(music_file_tree, relative_path)
+                                if song_file_name in files:
+                                    song.set_abs_path(abs_path)
                                     found_song = True
                                 else:
                                     songs_logger.info(
