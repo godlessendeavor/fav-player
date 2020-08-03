@@ -176,7 +176,10 @@ class MusicManager:
         """
         # TODO: create the interface to retrieve by ids on the server and complete it here
         try:
-            result = cls._music_db.api_songs_get_songs(score=score)
+            if score:
+                result = cls._music_db.api_songs_get_songs(score=score)
+            else:
+                result = cls._music_db.api_songs_get_songs()
         except Exception as ex:
             config.logger.exception('Exception when getting favorite songs')
             raise ex

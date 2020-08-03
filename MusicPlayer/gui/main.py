@@ -148,7 +148,8 @@ class GUI:
         add_songs_from_reviews_func = partial(self._execute_thread, add_songs_from_reviews_executor)
         self._songs_sub_menu.add_command(label="Add songs from reviews", command=add_songs_from_reviews_func)
 
-        self._songs_sub_menu.add_command(label="Create playlist from favorites", command=self._create_playlist_from_favorites)
+        self._songs_sub_menu.add_command(label="Create playlist from favorites",
+                                         command=self._create_playlist_from_favorites)
 
         # Create the Play sub menu
         self._play_sub_menu = Menu(self._menu_bar, tearoff=0)
@@ -321,7 +322,7 @@ class GUI:
             # add functionality for sorting
             for col in self._album_listbox["columns"]:
                 self._album_listbox.heading(col, text=col, command=lambda _col=col:
-                                            GUI._tree_view_sort_column(self._album_listbox, _col, False))
+                GUI._tree_view_sort_column(self._album_listbox, _col, False))
 
             self._album_listbox.column("Band", minwidth=0, width=220)
             self._album_listbox.column("Title", minwidth=0, width=280)
@@ -386,7 +387,8 @@ class GUI:
 
             def do_albums_not_in_collection():
                 """Shows a list with the albums not present in the collection."""
-                self._selected_bands = [self._album_listbox.item(band_id)['text'] for band_id in self._album_listbox.selection()]
+                self._selected_bands = [self._album_listbox.item(band_id)['text'] for band_id in
+                                        self._album_listbox.selection()]
                 thread_executor = UIThreadExecutor()
                 thread_executor.set_target_function(self._get_albums_not_in_collection_thread)
                 thread_executor.set_post_function(self._show_albums_not_in_collection)
@@ -494,7 +496,7 @@ class GUI:
             # add functionality for sorting
             for col in self._song_listbox["columns"]:
                 self._song_listbox.heading(col, text=col, command=lambda _col=col:
-                                           GUI._tree_view_sort_column(self._song_listbox, _col, False))
+                GUI._tree_view_sort_column(self._song_listbox, _col, False))
 
             self._song_listbox.column("Band", minwidth=0, width=220)
             self._song_listbox.column("Title", minwidth=0, width=280)
@@ -590,7 +592,8 @@ class GUI:
             self._future = executor.submit(thread_executor.target_thread)
 
         if thread_executor.post_function_args:
-            self._window_root.after(100, self._check_thread, thread_executor.post_function, thread_executor.post_function_args)
+            self._window_root.after(100, self._check_thread, thread_executor.post_function,
+                                    thread_executor.post_function_args)
         else:
             self._window_root.after(100, self._check_thread, thread_executor.post_function)
 
@@ -946,14 +949,27 @@ class GUI:
             self.score_entry = Entry(top)
             self.score_entry.grid(row=6, column=1)
             self.score_entry.insert(END, str(album.score) if album.score else '')
+            album_path_label = Label(top, text="Album path")
+            album_path_label.grid(row=7, column=0)
+            album_path_label_value_label = Label(top, text=album.path)
+            album_path_label_value_label.grid(row=7, column=1)
             review_label = Label(top, text="Review")
-            review_label.grid(row=7, column=0)
+            review_label.grid(row=8, column=0)
             self._review_text_box_album = Text(top, font='Times 12', relief=GROOVE, height=15, width=100)
-            self._review_text_box_album.grid(row=7, column=1)
+            self._review_text_box_album.grid(row=8, column=1)
             self._review_text_box_album.insert(END, str(album.review) if album.review else '')
+            button_path = Button(top, text='Choose path', command=self.choose_path)
+            button_path.grid(row=9, column=0)
             button = Button(top, text='Save', command=self.save)
-            button.grid(row=8, column=1)
+            button.grid(row=9, column=1)
             self.album = album
+
+        def choose_path(self):
+            initial_dir = config.MUSIC_PATH
+            album_path = filedialog.askopenfilenames(initialdir=initial_dir, parent=self.top,
+                                                     title=f"Choose path for album title {self.album.title}")
+            if album_path:
+                self.album.path = album_path[0]
 
         def save(self):
             self.album.title = self.title_entry.get().strip()
@@ -1046,7 +1062,8 @@ class GUI:
                     config.logger.info(f"Setting file name from {self.song.file_name} to {diff_path}")
                 else:
                     diff_path = file_name[0]
-                    config.logger.warning(f"Album has not path. Setting file name from {self.song.file_name} to {diff_path}")
+                    config.logger.warning(
+                        f"Album has not path. Setting file name from {self.song.file_name} to {diff_path}")
                 self.song.abs_path = file_name[0]
                 self.song.file_name = diff_path
                 return self.song
