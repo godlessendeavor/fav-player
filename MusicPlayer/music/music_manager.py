@@ -511,6 +511,7 @@ class MusicManager:
                             found_album = True
                             song.album = Album()
                             song.album.merge(album)
+                            song.album.path = album.path
                             found_song = False
                             if song.file_name:
                                 abs_path = os.path.join(album.path, song.file_name)
