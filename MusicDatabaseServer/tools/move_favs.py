@@ -1,10 +1,35 @@
 import requests
 from os.path import join
-import json
+import simplejson as json
 
+local = False
 # api-endpoints
+if local:
+    mstream_base_url = "http://localhost:3000"
+else:
+    mstream_base_url="http://192.168.1.107:6680"
+
 album_app_URL = "http://localhost:2020/music/fav_songs"
-mstream_URL = "http://localhost:3000/db/rate-song"
+mstream_URL = f"{mstream_base_url}/db/rate-song"
+login_mstream_URL = f"{mstream_base_url}/login"
+ping_mstream_URL = f"{mstream_base_url}/ping"
+
+access_token = None
+login_res = requests.post(url=login_mstream_URL,
+              json={'username': "godlessendeavor", 'password': "Never1986"},
+              headers={'content-type': 'application/json'})
+login_data = json.loads(login_res.text)
+access_token = login_data['token']
+
+if local:
+    mstream_path = "media"
+else:
+    ping_res = requests.post(url=login_mstream_URL,
+                  json={'username': "godlessendeavor", 'password': "Never1986"},
+                  headers={'content-type': 'application/json', 'x-access-token' : access_token})
+    ping_data = json.loads(ping_res.text)
+    access_token = ping_data['token']
+    mstream_path = ping_data['vpaths'][0]
 
 fav_data = requests.get(url=album_app_URL, headers={'Authorization': 'Bearer 666'})
 data = json.loads(fav_data.text)
@@ -14,15 +39,22 @@ for song in data['songs']:
     rating = round(rating * 2) / 2
     file_name = song['file_name']
     album_path = join(song['album']['band'], str(song['album']['year']) + ' - ' + song['album']['title'])
-    file_path = join('/media', album_path, file_name)
-    json_input = {'rating':rating, 'filepath': file_path.encode('utf-8')}
-    res = requests.post(url=mstream_URL,
-                        json= json_input,
-                        headers={'content-type':'application/json'})
+    file_path = join(mstream_path, album_path, file_name)
+    #json_input = {'rating': rating, 'filepath': file_path.encode('utf-8')}
+    json_input = {'rating': rating, 'filepath': file_path}
+    if not local:
+        res = requests.post(url=mstream_URL,
+                            json=json_input,
+                            headers={'content-type': 'application/json', 'x-access-token': access_token})
+    else:
+        res = requests.post(url=mstream_URL,
+                            json=json_input,
+                            headers={'content-type': 'application/json'})
+
     json_res = json.loads(res.text)
     if 'error' in json_res:
-        error_val = json_res['error'].encode('utf-8')
-        print('Error: {error_val}'.format(error_val=error_val))
+        error_val = json_res['error']
+        print(f'Error: {error_val}')
         print(json_input)
     else:
         pass
