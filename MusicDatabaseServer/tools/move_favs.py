@@ -35,6 +35,11 @@ else:
 fav_data = requests.get(url=album_app_URL, headers={'Authorization': 'Bearer '+os.environ.get('ACCESS_TOKEN')})
 data = json.loads(fav_data.text)
 
+if local:
+    headers = {'content-type': 'application/json', 'x-access-token': mstream_access_token}
+else:
+    headers = {'content-type': 'application/json'}
+
 for song in data['songs']:
     rating = song['score']
     rating = round(rating * 2) / 2
@@ -43,12 +48,6 @@ for song in data['songs']:
     file_path = join(mstream_path, album_path, file_name)
     #json_input = {'rating': rating, 'filepath': file_path.encode('utf-8')}
     json_input = {'rating': rating, 'filepath': file_path}
-
-    if local:
-        headers = {'content-type': 'application/json', 'x-access-token': mstream_access_token}
-    else:
-        headers = {'content-type': 'application/json'}
-
     res = requests.post(url=mstream_URL,
                         json=json_input,
                         headers=headers)
