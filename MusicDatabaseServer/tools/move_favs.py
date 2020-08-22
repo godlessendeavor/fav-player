@@ -15,7 +15,6 @@ mstream_URL = f"{mstream_base_url}/db/rate-song"
 login_mstream_URL = f"{mstream_base_url}/login"
 ping_mstream_URL = f"{mstream_base_url}/ping"
 
-mstream_access_token = None
 login_res = requests.post(url=login_mstream_URL,
               json={'username': "godlessendeavor", 'password': os.environ.get('MSTREAM_PASSWORD')},
               headers={'content-type': 'application/json'})
