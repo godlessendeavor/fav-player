@@ -43,14 +43,15 @@ for song in data['songs']:
     file_path = join(mstream_path, album_path, file_name)
     #json_input = {'rating': rating, 'filepath': file_path.encode('utf-8')}
     json_input = {'rating': rating, 'filepath': file_path}
-    if not local:
-        res = requests.post(url=mstream_URL,
-                            json=json_input,
-                            headers={'content-type': 'application/json', 'x-access-token': mstream_access_token})
+
+    if local:
+        headers = {'content-type': 'application/json', 'x-access-token': mstream_access_token}
     else:
-        res = requests.post(url=mstream_URL,
-                            json=json_input,
-                            headers={'content-type': 'application/json'})
+        headers = {'content-type': 'application/json'}
+
+    res = requests.post(url=mstream_URL,
+                        json=json_input,
+                        headers=headers)
 
     json_res = json.loads(res.text)
     if 'error' in json_res:
