@@ -15,24 +15,24 @@ mstream_URL = f"{mstream_base_url}/db/rate-song"
 login_mstream_URL = f"{mstream_base_url}/login"
 ping_mstream_URL = f"{mstream_base_url}/ping"
 
-access_token = None
+mstream_access_token = None
 login_res = requests.post(url=login_mstream_URL,
               json={'username': "godlessendeavor", 'password': os.environ.get('MSTREAM_PASSWORD')},
               headers={'content-type': 'application/json'})
 login_data = json.loads(login_res.text)
-access_token = login_data['token']
+mstream_access_token = login_data['token']
 
 if local:
     mstream_path = "media"
 else:
     ping_res = requests.post(url=login_mstream_URL,
-                  json={'username': "godlessendeavor", 'password': "Never1986"},
-                  headers={'content-type': 'application/json', 'x-access-token' : access_token})
+                             json={'username': "godlessendeavor", 'password': os.environ.get('MSTREAM_PASSWORD')},
+                             headers={'content-type': 'application/json', 'x-access-token' : mstream_access_token})
     ping_data = json.loads(ping_res.text)
-    access_token = ping_data['token']
+    mstream_access_token = ping_data['token']
     mstream_path = ping_data['vpaths'][0]
 
-fav_data = requests.get(url=album_app_URL, headers={'Authorization': 'Bearer 666'})
+fav_data = requests.get(url=album_app_URL, headers={'Authorization': 'Bearer '+os.environ.get('ACCESS_TOKEN')})
 data = json.loads(fav_data.text)
 
 for song in data['songs']:
@@ -46,7 +46,7 @@ for song in data['songs']:
     if not local:
         res = requests.post(url=mstream_URL,
                             json=json_input,
-                            headers={'content-type': 'application/json', 'x-access-token': access_token})
+                            headers={'content-type': 'application/json', 'x-access-token': mstream_access_token})
     else:
         res = requests.post(url=mstream_URL,
                             json=json_input,
