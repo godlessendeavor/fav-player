@@ -1,6 +1,7 @@
 import requests
 from os.path import join
 import simplejson as json
+import os
 
 local = False
 # api-endpoints
@@ -16,7 +17,7 @@ ping_mstream_URL = f"{mstream_base_url}/ping"
 
 access_token = None
 login_res = requests.post(url=login_mstream_URL,
-              json={'username': "godlessendeavor", 'password': "Never1986"},
+              json={'username': "godlessendeavor", 'password': os.environ.get('MSTREAM_PASSWORD')},
               headers={'content-type': 'application/json'})
 login_data = json.loads(login_res.text)
 access_token = login_data['token']
