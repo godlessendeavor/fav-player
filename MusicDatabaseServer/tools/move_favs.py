@@ -5,7 +5,7 @@ import requests
 import simplejson as json
 import time
 
-local = True
+local = False
 clear = False
 # api-endpoints
 if local:
@@ -83,7 +83,6 @@ for song in song_list:
 
     if file_path.lower() not in rated_files_mstream:
         print(f'!!!!!!File {file_path} was not found in mstream')
-
         time.sleep(0.1)
         json_input = {'rating': rating, 'filepath': file_path_mstream}
         res = requests.post(url=mstream_URL, json=json_input, headers=headers)
@@ -93,9 +92,6 @@ for song in song_list:
             error_val = json_res['error']
             print(f'Error: {error_val}')
             print(json_input)
-        #elif 'typeSave' in json_res and json_res['typeSave'] == 'update':
-        #    print(f'This was an updateeeee!!!')
-        #    break
         else:
             print('Success with {}'.format(json_res))
 
