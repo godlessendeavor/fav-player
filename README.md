@@ -6,13 +6,14 @@ Configuration
 =============
 
 The following parameters need to be defined
-
-  DATABASE_HOST: "musicdb"
-  DATABASE_NAME: "music_test"
-  DATABASE_PORT: "330"
-  DATABASE_USER: "admin"
-  ACCESS_TOKEN: "666"
-  APP_PORT: 2020`
+```
+  DATABASE_HOST: the IP of the database
+  DATABASE_NAME: database name
+  DATABASE_PORT: port to connect to the database 
+  DATABASE_USER: username of the database
+  ACCESS_TOKEN: access token to connect to the database admin
+  APP_PORT: port to connect to the APP
+```
 
 Deployment
 ==========
