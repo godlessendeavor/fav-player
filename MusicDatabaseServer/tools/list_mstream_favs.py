@@ -1,6 +1,5 @@
 import requests
-from os.path import join
-import simplejson as json
+from json import loads
 import os
 
 local = False
@@ -20,13 +19,13 @@ else:
     login_res = requests.post(url=login_mstream_URL,
                               json={'username': "godlessendeavor", 'password': os.environ.get('MSTREAM_PASSWORD')},
                               headers={'content-type': 'application/json'})
-    login_data = json.loads(login_res.text)
+    login_data = loads(login_res.text)
     print(login_data)
     access_token = login_data['token']
     ping_res = requests.post(url=login_mstream_URL,
                   json={'username': "godlessendeavor", 'password': os.environ.get('MSTREAM_PASSWORD')},
                   headers={'content-type': 'application/json', 'x-access-token': access_token})
-    ping_data = json.loads(ping_res.text)
+    ping_data = loads(ping_res.text)
     access_token = ping_data['token']
     mstream_path = ping_data['vpaths'][0]
 
@@ -38,6 +37,6 @@ else:
 res = requests.get(url=amount_mstream_URL,
                        headers=headers)
 
-json_res = json.loads(res.text)
+json_res = loads(res.text)
 print(json_res)
 
