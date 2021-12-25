@@ -2,18 +2,29 @@ import os
 from os.path import join
 
 import requests
-import simplejson as json
+import json
 import time
+import argparse
 
-local = False
+parser = argparse.ArgumentParser()
+parser.add_argument('--mstreamip', help='IP address of mstream')
+parser.add_argument('--musicdbip', help='IP address of musicdbserver')
+args = parser.parse_args()
+
 clear = False
 # api-endpoints
-if local:
-    mstream_base_url = "http://localhost:3000"
+if not args.mstreamip:
+    mstream_base_url = "http://localhost:6680"
 else:
-    mstream_base_url="http://192.168.1.107:6680"
+    mstream_base_url = args.ip
 
-album_app_URL = "http://localhost:2020/music/fav_songs"
+if not args.musicdbip:
+    musicdb_URL = "http://localhost:2020"
+else:
+    musicdb_URL = args.musicdbip
+
+musicdb_URL = musicdb_URL + '/music/fav_songs'
+
 mstream_URL = f"{mstream_base_url}/db/rate-song"
 login_mstream_URL = f"{mstream_base_url}/login"
 ping_mstream_URL = f"{mstream_base_url}/ping"
@@ -22,24 +33,20 @@ mstream_rated_amount_URL = f"{mstream_base_url}/db/amount-rated-songs"
 mstream_all_rated_URL = f"{mstream_base_url}/db/all-rated-songs"
 mstream_clear_rated_URL = f"{mstream_base_url}/db/clear-rated"
 
-if local:
-    mstream_path = "media"
-    headers = {'content-type': 'application/json'}
-else:
-    login_res = requests.post(url=login_mstream_URL,
-                              json={'username': "godlessendeavor", 'password': os.environ.get('MSTREAM_PASSWORD')},
-                              headers={'content-type': 'application/json'})
-    login_data = json.loads(login_res.text)
-    mstream_access_token = login_data['token']
-    ping_res = requests.post(url=login_mstream_URL,
-                             json={'username': "godlessendeavor", 'password': os.environ.get('MSTREAM_PASSWORD')},
-                             headers={'content-type': 'application/json', 'x-access-token' : mstream_access_token})
-    ping_data = json.loads(ping_res.text)
-    mstream_access_token = ping_data['token']
-    mstream_path = ping_data['vpaths'][0]
-    headers = {'content-type': 'application/json', 'x-access-token': mstream_access_token}
+login_res = requests.post(url=login_mstream_URL,
+                          json={'username': "godlessendeavor", 'password': os.environ.get('MSTREAM_PASSWORD')},
+                          headers={'content-type': 'application/json'})
+login_data = json.loads(login_res.text)
+mstream_access_token = login_data['token']
+ping_res = requests.post(url=login_mstream_URL,
+                         json={'username': "godlessendeavor", 'password': os.environ.get('MSTREAM_PASSWORD')},
+                         headers={'content-type': 'application/json', 'x-access-token' : mstream_access_token})
+ping_data = json.loads(ping_res.text)
+mstream_access_token = ping_data['token']
+mstream_path = ping_data['vpaths'][0]
+headers = {'content-type': 'application/json', 'x-access-token': mstream_access_token}
 
-fav_data = requests.get(url=album_app_URL, headers={'Authorization': 'Bearer '+os.environ.get('ACCESS_TOKEN')})
+fav_data = requests.get(url=musicdb_URL, headers={'Authorization': 'Bearer ' + os.environ.get('ACCESS_TOKEN')})
 data = json.loads(fav_data.text)
 
 if clear:
