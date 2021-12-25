@@ -26,8 +26,12 @@ Once you have that you can install the kubernetes dashboard with this
 
 ```kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.0-rc3/aio/deploy/recommended.yaml```
 
-To access to the overview you can go to
-http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy/#/overview
+To access to the overview you need to start a kubectl proxy
+ 
+ ```kubectl proxy```
+ 
+ and then you can go to
+[Local kubernetes overview](http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy/#/overview)
 
 In order to access you need to get an auth token, you can do it with this oneliner
 ```kubectl -n kube-system describe secret $(kubectl -n kube-system get secret | awk '/^deployment-controller-token-/{print $1}') | awk '$1=="token:"{print $2}'```
