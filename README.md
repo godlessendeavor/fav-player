@@ -1,11 +1,13 @@
 # fav-player
 
-This is the MP3 Player
+This repository contains two applications. 
+* A server for the music database
+* A desktop application for playing music
 
 Configuration
 =============
 
-The following parameters need to be defined
+The following env vars need to be defined
 ```
   DATABASE_HOST: the IP of the database
   DATABASE_NAME: database name
@@ -55,10 +57,17 @@ kind: ConfigMap
 metadata:
   name: musicdb-config
 data:
-  DATABASE_HOST: "musicdb"
-  DATABASE_NAME: "music_test"
-  DATABASE_PORT: "330"
+  DATABASE_HOST: "localhost"
+  DATABASE_NAME: "musicdb"
+  DATABASE_PORT: "3306"
   DATABASE_USER: "admin"
   ACCESS_TOKEN: "666"
   APP_PORT: 2020
 ```
+
+Development
+===========
+
+For development with the database only:
+ - you can deploy the musicdb service (`kubectl apply musicdb-service`)
+ - and port forward the database to your localhost`kubectl port-forward service/musicdb 3306:3306`

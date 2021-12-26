@@ -5,3 +5,5 @@ Flask-Injector
 injector==0.17.0
 pymysql
 peewee
+Flask-Cors==3.0.10
+cryptography==36.0.1

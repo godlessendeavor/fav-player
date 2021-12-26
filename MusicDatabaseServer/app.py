@@ -9,6 +9,7 @@ from flask_injector import FlaskInjector
 from connexion.resolver import RestyResolver
 from providers.DatabaseProvider import DatabaseProvider
 from config import config
+from flask_cors import CORS
 
 from injector import Binder
 
@@ -39,6 +40,7 @@ def create_app():
         resolver=RestyResolver('api'),
         arguments={'title': 'DatabaseServer'},
         strict_validation=True)
+    CORS(conn_app.app)
     FlaskInjector(app=conn_app.app, modules=[configure])
     return conn_app
 

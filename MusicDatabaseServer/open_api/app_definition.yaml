@@ -5,8 +5,8 @@ info:
 servers:
 - url: /
   description: "Music Database Server"
-security:
-- oauth2: []
+#security:
+#- oauth2: []
 tags:
 - name: public
   description: Operations available to regular developers
@@ -232,12 +232,12 @@ components:
           type: string
         album:
           $ref: '#/components/schemas/album'
-  securitySchemes:
-    oauth2:
-      type: oauth2
-      flows:
-        implicit:
-          authorizationUrl: https://example.com/oauth2/dialog
-          scopes:
-            uid: Unique identifier of the user accessing the service.
-      x-tokenInfoFunc: app.token_info
+#  securitySchemes:
+#    oauth2:
+#      type: oauth2
+#      flows:
+#        implicit:
+#          authorizationUrl: https://example.com/oauth2/dialog
+#          scopes:
+#            uid: Unique identifier of the user accessing the service.
+#      x-tokenInfoFunc: app.token_info
