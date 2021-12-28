@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-initdb-config
+data:
+  initdb.sql: |
+    CREATE TABLE music (Id INT NOT NULL,
+                        groupName VARCHAR(256),
+                        copy VARCHAR(256),
+                        country VARCHAR(256),
+                        loc VARCHAR(256),
+                        mark VARCHAR(256),
+                        review BLOB,
+                        style VARCHAR(256),
+                        title VARCHAR(256),
+                        type VARCHAR(256),
+                        year INT,
+                        PRIMARY KEY (Id));
+    CREATE TABLE favorites (Id INT NOT NULL,
+                            disc_id INT NOT NULL,
+                            score FLOAT,
+                            track_no INT,
+                            track_title VARCHAR(256),
+                            file_name VARCHAR(256),
+                            type VARCHAR(256)
+                            PRIMARY KEY (Id),
+                            FOREIGN KEY (disc_id) REFERENCES music(Id));
