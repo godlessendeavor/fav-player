@@ -204,20 +204,28 @@ class DatabaseProvider(object):
         return song_id, 200
 
     @database_mgmt
-    def get_albums(self, quantity, album_id):
-        """Gets an album from the album id.
-        If not provided and quantity is given then it will get a random list of albums limited by quantity.
+    def get_album(self, album_title, band):
+        """Gets an album by its title and band name
         Args:
-            quantity(int): the number of albums to retrieve
-            album_id(int): the id of the album to retrieve
+            album_title(str): the id of the album to get
+            band(str): the name of the band
         """
-        # TODO: get album list if album_id is a list
-        if album_id:
-            result = Album.select().where(Album.id == album_id)
-        elif quantity:
-            result = Album.select().order_by(fn.Rand()).limit(int(quantity))
+        result = Album.select().where((Album.band == band) & (Album.title == album_title))
+        if result:
+            list_result = [row for row in result.dicts()]
+            logger.debug('Getting result for get_album: %s', list_result)
+            return list_result, 200
         else:
-            result = Album.select()
+            logger.error(f"Could not find album with title {album_title} for band {band}")
+            return album_title, 400
+
+    @database_mgmt
+    def get_album_by_id(self, album_id):
+        """Gets an album by its id
+        Args:
+            album_id(int): the id of the album to get
+        """
+        result = Album.select().where(Album.id == album_id)
         if result:
             list_result = [row for row in result.dicts()]
             logger.debug('Getting result for get_album: %s', list_result)
@@ -225,6 +233,21 @@ class DatabaseProvider(object):
         else:
             logger.error(f"Could not find album with id {album_id}")
             return album_id, 400
+
+    @database_mgmt
+    def get_random_albums(self, quantity):
+        """Gets random albums
+        Args:
+            quantity(int): the number of albums to retrieve
+        """
+        result = Album.select().order_by(fn.Rand()).limit(int(quantity))
+        if result:
+            list_result = [row for row in result.dicts()]
+            logger.debug('Getting result for get_album: %s', list_result)
+            return list_result, 200
+        else:
+            logger.error(f"Could not find random albums")
+            return quantity, 400
 
     @database_mgmt
     def create_album(self, album) -> str:

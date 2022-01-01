@@ -6,10 +6,18 @@ Created on Oct 22, 2019
 from flask_injector import inject
 from providers.DatabaseProvider import DatabaseProvider
 
+@inject
+def get_album(data_provider=DatabaseProvider, album_title=None, band=None) -> str:
+    return data_provider().get_album(album_title, band)
 
 @inject
-def get_albums(data_provider=DatabaseProvider, quantity=None, album_id=None) -> str:
-    return data_provider().get_albums(quantity, album_id)
+def get_album_by_id(data_provider=DatabaseProvider, id=None) -> str:
+    return data_provider().get_album_by_id(id)
+
+
+@inject
+def get_random_albums(data_provider=DatabaseProvider, quantity=None) -> str:
+    return data_provider().get_random_albums(quantity)
 
 
 @inject

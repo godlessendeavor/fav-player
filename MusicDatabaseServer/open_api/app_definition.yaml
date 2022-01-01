@@ -21,37 +21,36 @@ paths:
         200:
           description: OK
           content: {}
-  /music/albums:
+
+  /music/album:
     get:
       tags:
-      - public
-      summary: Fetch albums from the music database
-      operationId: api.albums.get_albums
+        - public
+      summary: Fetch an album from the music database
+      operationId: api.albums.get_album
       parameters:
-      - name: quantity
-        in: query
-        description: Number of random albums to get. If not indicated it will return
-          all albums.
-        schema:
-          type: integer
-      - name: album_id
-        in: query
-        description: Id of album to get. If this parameter is set the parameter quantity
-          will not be checked.
-        schema:
-          type: integer
+        - name: album_title
+          in: query
+          description: Title of album to get.
+          required: true
+          schema:
+            type: string
+        - name: band
+          in: query
+          description: Name of the band to get.
+          required: true
+          schema:
+            type: string
       responses:
         200:
           description: Fetch album(s) from the music database
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/album'
+                $ref: '#/components/schemas/album'
     put:
       tags:
-      - public
+        - public
       summary: Updates an album.
       operationId: api.albums.update_album
       requestBody:
@@ -72,7 +71,7 @@ paths:
       x-codegen-request-body-name: album
     post:
       tags:
-      - public
+        - public
       summary: Creates a new album.
       operationId: api.albums.create_album
       requestBody:
@@ -93,30 +92,77 @@ paths:
       x-codegen-request-body-name: album
     delete:
       tags:
-      - public
+        - public
       summary: Deletes an album.
       operationId: api.albums.delete_album
       parameters:
-      - name: album_id
+        - name: album_id
+          in: query
+          description: The album id to delete.
+          required: true
+          schema:
+            type: integer
+      responses:
+        200:
+          description: OK
+          content: {}
+
+  /music/album{id}:
+    get:
+      tags:
+        - public
+      summary: Fetch an album from the music database
+      operationId: api.albums.get_album_by_id
+      parameters:
+        - name: id
+          in: path
+          description: Album ID
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        200:
+          description: Fetch an album by id from the music database
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/album'
+
+
+  /music/random_albums:
+    get:
+      tags:
+      - public
+      summary: Fetch albums from the music database
+      operationId: api.albums.get_random_albums
+      parameters:
+      - name: quantity
         in: query
-        description: The album id to delete.
+        description: Number of random albums to get.
         required: true
         schema:
           type: integer
       responses:
         200:
-          description: OK
-          content: {}
+          description: Fetch random album(s) from the music database
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/album'
+
   /music/fav_songs:
     get:
       tags:
       - public
-      summary: Fetch random songs from the favorites database
+      summary: Fetch random songs from the songs database
       operationId: api.songs.get_songs
       parameters:
       - name: quantity
         in: query
-        description: Number of favorite songs to get. If not indicated it will return
+        description: Number of songs to get. If not indicated it will return
           all songs (if there is at least one song matching the score criteria).
         schema:
           type: integer
@@ -128,7 +174,7 @@ paths:
           type: number
       responses:
         200:
-          description: Fetch random songs from the favorites database
+          description: Fetch random songs from the songs database
           content:
             application/json:
               schema:
@@ -141,7 +187,7 @@ paths:
     put:
       tags:
       - public
-      summary: Updates a favorite song.
+      summary: Updates a song.
       operationId: api.songs.update_song
       requestBody:
         description: The song to update.
@@ -159,7 +205,7 @@ paths:
     post:
       tags:
       - public
-      summary: Creates a new favorite song.
+      summary: Creates a new song.
       operationId: api.songs.create_song
       requestBody:
         description: The song to create.
@@ -177,7 +223,7 @@ paths:
     delete:
       tags:
       - public
-      summary: Deletes a favorite song.
+      summary: Deletes a song.
       operationId: api.songs.delete_song
       parameters:
       - name: song_id
