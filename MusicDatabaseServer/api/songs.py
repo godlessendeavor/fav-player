@@ -8,9 +8,12 @@ from providers.DatabaseProvider import DatabaseProvider
 
 
 @inject
-def get_songs(data_provider=DatabaseProvider, quantity=None, score=0.0) -> str:
-    return data_provider().get_songs(quantity, score)
+def get_random_songs(data_provider=DatabaseProvider, quantity=None, score=0.0) -> str:
+    return data_provider().get_random_songs(quantity, score)
 
+@inject
+def get_song(data_provider=DatabaseProvider, quantity=None, score=0.0) -> str:
+    return "404"
 
 @inject
 def create_song(data_provider=DatabaseProvider, song=None):

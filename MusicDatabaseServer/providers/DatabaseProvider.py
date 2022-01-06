@@ -106,7 +106,7 @@ class DatabaseProvider(object):
             return None
 
     @database_mgmt
-    def get_songs(self, quantity=None, score=None):
+    def get_random_songs(self, quantity=None, score=None):
         """Get songs from the favorites table by quantity and score
         Args:
             quantity(int): limit of songs to retrieve

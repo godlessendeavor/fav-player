@@ -158,7 +158,7 @@ paths:
       tags:
       - public
       summary: Fetch random songs from the songs database
-      operationId: api.songs.get_songs
+      operationId: api.songs.get_random_songs
       parameters:
       - name: quantity
         in: query
@@ -175,6 +175,30 @@ paths:
       responses:
         200:
           description: Fetch random songs from the songs database
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  songs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/song'
+  /music/song:
+    get:
+      tags:
+        - public
+      summary: Fetch random songs from the songs database
+      operationId: api.songs.get_song
+      parameters:
+        - name: file_name
+          in: query
+          description: File name of the song to search.
+          schema:
+            type: string
+      responses:
+        200:
+          description: Fetch a song from the songs database
           content:
             application/json:
               schema:
