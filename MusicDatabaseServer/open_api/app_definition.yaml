@@ -266,7 +266,9 @@ components:
       type: object
       properties:
         id:
-          type: integer
+          oneOf:
+            - type: string
+            - type: integer
         band:
           type: string
         title:
@@ -274,13 +276,17 @@ components:
         style:
           type: string
         year:
-          type: integer
+          oneOf:
+            - type: string
+            - type: integer
         country:
           type: string
         type:
           type: string
         score:
-          type: string
+          oneOf:
+            - type: string
+            - type: number
         review:
           type: string
         copy:
@@ -289,15 +295,21 @@ components:
       type: object
       properties:
         id:
-          type: integer
+          oneOf:
+            - type: string
+            - type: integer
         title:
           type: string
         file_name:
           type: string
         track_number:
-          type: string
+          oneOf:
+            - type: string
+            - type: integer
         score:
-          type: string
+          oneOf:
+            - type: string
+            - type: number
         type:
           type: string
         album:
