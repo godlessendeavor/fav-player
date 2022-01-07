@@ -29,15 +29,15 @@ class BaseModel(Model):
 
 class Album(BaseModel):
     id = AutoField(column_name='Id')
-    copy = CharField(constraints=[SQL("DEFAULT ' '")])
-    band = CharField(column_name='groupName', constraints=[SQL("DEFAULT ' '")])
-    country = CharField(column_name='loc', constraints=[SQL("DEFAULT ' '")])
-    score = CharField(column_name='mark', constraints=[SQL("DEFAULT ' '")])
-    review = TextField(null=True)
-    style = CharField(constraints=[SQL("DEFAULT ' '")])
-    title = CharField(constraints=[SQL("DEFAULT ' '")])
-    type = CharField(constraints=[SQL("DEFAULT ' '")])
-    year = IntegerField(constraints=[SQL("DEFAULT 0")], null=True)
+    copy = CharField(constraints=[SQL("DEFAULT ''")], default='')
+    band = CharField(column_name='groupName', constraints=[SQL("DEFAULT ''")], default='')
+    country = CharField(column_name='loc', constraints=[SQL("DEFAULT ''")], default='')
+    score = CharField(column_name='mark', constraints=[SQL("DEFAULT ''")], default='')
+    review = TextField(null=True, default='')
+    style = CharField(constraints=[SQL("DEFAULT ''")], default='')
+    title = CharField(constraints=[SQL("DEFAULT ''")], default='')
+    type = CharField(constraints=[SQL("DEFAULT ''")], default='')
+    year = IntegerField(constraints=[SQL("DEFAULT 0")], null=True, default=0)
 
     class Meta:
         table_name = 'music'
@@ -46,11 +46,11 @@ class Album(BaseModel):
 class Favorites(BaseModel):
     id = AutoField(column_name='Id')
     album_id = ForeignKeyField(Album, column_name='disc_id', backref='favorites')
-    score = FloatField(constraints=[SQL("DEFAULT 0")])
-    track_number = IntegerField(column_name='track_no', constraints=[SQL("DEFAULT 0")])
-    title = CharField(column_name='track_title')
+    score = FloatField(constraints=[SQL("DEFAULT 0")], default=0)
+    track_number = IntegerField(column_name='track_no', constraints=[SQL("DEFAULT 0")], default='')
+    title = CharField(column_name='track_title', default='')
     file_name = CharField()
-    type = TextField(null=True)
+    type = TextField(null=True, default='')
 
     class Meta:
         table_name = 'favorites'
@@ -68,6 +68,7 @@ def database_mgmt(func):
             ret = func(*args, **kwargs)
         except Exception as ex:
             logger.warning('Holding exception to close Database')
+            logger.exception(ex)
             if not database.is_closed():
                 database.close()
             raise (ex)
@@ -228,7 +229,7 @@ class DatabaseProvider(object):
         result = Album.select().where(Album.id == album_id)
         if result:
             list_result = [row for row in result.dicts()]
-            logger.debug('Getting result for get_album: %s', list_result)
+            logger.debug('Getting result for get_album_by_id: %s', list_result)
             return list_result, 200
         else:
             logger.error(f"Could not find album with id {album_id}")
@@ -243,7 +244,7 @@ class DatabaseProvider(object):
         result = Album.select().order_by(fn.Rand()).limit(int(quantity))
         if result:
             list_result = [row for row in result.dicts()]
-            logger.debug('Getting result for get_album: %s', list_result)
+            logger.debug('Getting result for get_random_album: %s', list_result)
             return list_result, 200
         else:
             logger.error(f"Could not find random albums")
@@ -279,6 +280,7 @@ class DatabaseProvider(object):
             album_entry.type = album['type']
         if 'country' in album:
             album_entry.country = album['country']
+            logger.debug(f'Country is {album_entry.country}')
         if 'copy' in album:
             album_entry.copy = album['copy']
         if 'style' in album:
@@ -286,15 +288,16 @@ class DatabaseProvider(object):
         # if an update is done we will need the id as well
         if 'id' in album:
             album_entry.id = album['id']
+        logger.debug(f'Country is {album_entry.country}')
         # save object in database
-        logger.debug(f'Saving album {album_entry} in database')
+        logger.debug(f'Saving album with title {album_entry.title} for band {album_entry.band} in database')
         if album_entry.save():
             album['id'] = album_entry.id
             return album, 200
         else:
             # TODO: how to identify a failure from a case where there are no changes
             logger.error(f'Could not save album {album_entry} in database. Maybe there are no changes')
-            return album, 400
+            return album, 500
 
     @database_mgmt
     def update_album(self, album) -> str:
