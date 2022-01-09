@@ -4,7 +4,7 @@ metadata:
   name: mysql-initdb-config
 data:
   initdb.sql: |
-    CREATE TABLE music (Id        INT NOT NULL,
+    CREATE TABLE music (Id        INT          NOT NULL AUTO_INCREMENT,
                         band      VARCHAR(256) DEFAULT '',
                         copy      VARCHAR(256) DEFAULT '',
                         country   VARCHAR(256) DEFAULT '',
@@ -15,7 +15,7 @@ data:
                         type      VARCHAR(256) DEFAULT '',
                         year      INT          DEFAULT 0,
                         PRIMARY KEY (Id));
-    CREATE TABLE favorites (Id           INT NOT NULL,
+    CREATE TABLE favorites (Id           INT NOT NULL AUTO_INCREMENT,
                             album_id     INT NOT NULL,
                             score        FLOAT        DEFAULT 0,
                             track_number INT          DEFAULT 0,

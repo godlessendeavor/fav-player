@@ -213,9 +213,8 @@ class DatabaseProvider(object):
         """
         result = Album.select().where((Album.band == band) & (Album.title == album_title))
         if result:
-            list_result = [row for row in result.dicts()]
-            logger.debug('Getting result for get_album: %s', list_result)
-            return list_result, 200
+            logger.debug('Getting result for get_album: %s', result)
+            return result, 200
         else:
             logger.error(f"Could not find album with title {album_title} for band {band}")
             return album_title, 400
@@ -256,6 +255,12 @@ class DatabaseProvider(object):
         # TODO: could we use the next line to convert to object with attributes from json dict?
         # album_entry = json.loads(album, object_hook=lambda d: Namespace(**d))
 
+        # first let's check if the album provided already exists
+        result = Album.select().where((Album.band == album['band']) & (Album.title == album['title']) & (Album.year == int(album['year'])))
+        if result:
+            logger.error(f'Album with title {album["title"]} for band {album["band"]} and year {int(album["year"])} already exists in database')
+            return album, 419
+
         album_entry = Album()
         # first copy compulsory fields and validate types
         try:
@@ -288,7 +293,6 @@ class DatabaseProvider(object):
         # if an update is done we will need the id as well
         if 'id' in album:
             album_entry.id = album['id']
-        logger.debug(f'Country is {album_entry.country}')
         # save object in database
         logger.debug(f'Saving album with title {album_entry.title} for band {album_entry.band} in database')
         if album_entry.save():
