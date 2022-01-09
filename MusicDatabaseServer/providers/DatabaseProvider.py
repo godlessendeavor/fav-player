@@ -89,22 +89,31 @@ class DatabaseProvider(object):
         result = Favorites.select().where((Favorites.album_id == album_id) & (Favorites.title == song_title))
         return [row for row in result.dicts()]
 
+    @database_mgmt
+    def _search_song_by_file_name_and_album_id(self, file_name, album_id):
+        """
+            Gets a song from the favorites table by file name and album id.
+        """
+        result = Favorites.select().where((Favorites.album_id == album_id) & (Favorites.file_name == file_name))
+        return [row for row in result.dicts()]
+
     def _get_album_for_song(self, song):
         """Fills in the album info for a given song
         Args:
             song(dict): the song to fill the info for
         """
-        if song and song['album_id']:
-            album_list, result = self.get_albums(None, song['album_id'])
-            if result == 200:
-                song['album'] = album_list[0]
-            else:
-                logger.error(f"Could not find album for song with album id {song['album_id']} and song id {song['id']}")
-                return None
-            return song
-        else:
+        if not song and not song['album_id']:
             logger.error(f"Could not get a song or album id for {song}")
             return None
+
+        album_list, result = self.get_album_by_id(song['album_id'])
+        if result == 200:
+            song['album'] = album_list[0]
+        else:
+            logger.error(f"Could not find album for song with album id {song['album_id']} and song id {song['id']}")
+            return None
+        return song
+
 
     @database_mgmt
     def get_random_songs(self, quantity=None, score=None):
@@ -142,45 +151,46 @@ class DatabaseProvider(object):
         Args:
             song(dict): the song to add to the table.
         """
-        if song:
-            fav = Favorites()
-            # first copy compulsory fields and validate types
-            try:
-                fav.title = song['title']
-                fav.score = float(song['score'])
-                fav.album_id = int(song['album']['id'])
-                fav.file_name = song['file_name']
-            except KeyError:
-                logger.exception('Exception on key when creating favorite song')
-                return song, 400
-            except ValueError:
-                logger.exception('Exception on value when creating favorite song')
-                return song, 400
-            # now copy optional fields
-            try:
-                fav.track_number = int(song['track_number'])
-                fav.type = song['type']
-            except KeyError:
-                logger.warning('Type of song was not provided for song: ', song)
-
-            try:
-                # id was provided so it was already on the database. This will update the existing song
-                fav.id = song['id']
-            except KeyError:
-                # Id was not provided search song by title and album_id, perhaps it already exists
-                result = self._search_song_by_title_and_album_id(fav.title, fav.album_id)
-                if result and result[0]:
-                    try:
-                        # id exists add it to the object to save to update the existing one
-                        fav.id = result[0]['id']
-                    except KeyError:
-                        logger.exception('Exception on value when creating favorite song')
-                        return None, 400
-            # save object in database
-            fav.save()
-            return song, 200
-        else:
+        if not song:
+            logger.error("No song was provided")
             return None, 400
+
+        fav = Favorites()
+        # first copy compulsory fields and validate types
+        try:
+            fav.title = song['title']
+            fav.score = float(song['score'])
+            fav.album_id = int(song['album']['id'])
+            fav.file_name = song['file_name']
+        except KeyError:
+            logger.exception('Exception on key when creating favorite song')
+            return song, 400
+        except ValueError:
+            logger.exception('Exception on value when creating favorite song')
+            return song, 400
+        # now copy optional fields
+        try:
+            fav.track_number = int(song['track_number'])
+            fav.type = song['type']
+        except KeyError:
+            logger.warning('Type of song was not provided for song: ', song)
+
+        try:
+            # id was provided so it was already on the database. This will update the existing song
+            fav.id = song['id']
+        except KeyError:
+            # Id was not provided search song by title and album_id, in case it already exists
+            result = self._search_song_by_file_name_and_album_id(fav.file_name, fav.album_id)
+            if result and result[0]:
+                try:
+                    # id exists add it to the object to save to update the existing one
+                    fav.id = result[0]['id']
+                except KeyError:
+                    logger.exception('Exception on value when creating favorite song')
+                    return None, 400
+        # save object in database
+        fav.save()
+        return song, 200
 
     @database_mgmt
     def update_song(self, song):
@@ -255,13 +265,17 @@ class DatabaseProvider(object):
         # TODO: could we use the next line to convert to object with attributes from json dict?
         # album_entry = json.loads(album, object_hook=lambda d: Namespace(**d))
 
-        # first let's check if the album provided already exists
-        result = Album.select().where((Album.band == album['band']) & (Album.title == album['title']) & (Album.year == int(album['year'])))
-        if result:
-            logger.error(f'Album with title {album["title"]} for band {album["band"]} and year {int(album["year"])} already exists in database')
-            return album, 419
-
         album_entry = Album()
+        # first let's check if the album provided already exists
+        album_res, result = self.get_album(album_title=album['title'], band=album['band'])
+        print(album_res)
+        if result == 200:
+            # TODO: perhaps an update is needed. Copy the album id and continue
+            return album, 200
+        elif 'id' in album:
+            # if an update is done we will need the id as well
+            album_entry.id = album['id']
+
         # first copy compulsory fields and validate types
         try:
             album_entry.band = album['band']
@@ -290,9 +304,6 @@ class DatabaseProvider(object):
             album_entry.copy = album['copy']
         if 'style' in album:
             album_entry.style = album['style']
-        # if an update is done we will need the id as well
-        if 'id' in album:
-            album_entry.id = album['id']
         # save object in database
         logger.debug(f'Saving album with title {album_entry.title} for band {album_entry.band} in database')
         if album_entry.save():
