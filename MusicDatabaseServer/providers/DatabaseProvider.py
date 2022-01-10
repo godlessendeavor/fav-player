@@ -45,7 +45,7 @@ class Album(BaseModel):
 
 class Favorites(BaseModel):
     id = AutoField(column_name='Id')
-    album_id = ForeignKeyField(Album, column_name='disc_id', backref='favorites')
+    album_id = ForeignKeyField(Album, column_name='album_id', backref='favorites')
     score = FloatField(constraints=[SQL("DEFAULT 0")], default=0)
     track_number = IntegerField(constraints=[SQL("DEFAULT 0")], default='')
     title = CharField(column_name='track_title', default='')
@@ -54,6 +54,8 @@ class Favorites(BaseModel):
 
     class Meta:
         table_name = 'favorites'
+
+    #TODO: add to_domain_object
 
 
 def database_mgmt(func):
@@ -223,8 +225,9 @@ class DatabaseProvider(object):
         """
         result = Album.select().where((Album.band == band) & (Album.title == album_title))
         if result:
-            logger.debug('Getting result for get_album: %s', result)
-            return result, 200
+            list_result = [row for row in result.dicts()]
+            logger.debug('Getting result for get_album: %s', list_result)
+            return list_result, 200
         else:
             logger.error(f"Could not find album with title {album_title} for band {band}")
             return album_title, 400
@@ -271,6 +274,7 @@ class DatabaseProvider(object):
         print(album_res)
         if result == 200:
             # TODO: perhaps an update is needed. Copy the album id and continue
+            logger.info(f"Album with title {album['title']} already exists");
             return album, 200
         elif 'id' in album:
             # if an update is done we will need the id as well
