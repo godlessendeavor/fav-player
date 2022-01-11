@@ -12,10 +12,6 @@ def get_random_songs(data_provider=DatabaseProvider, quantity=None, score=0.0) -
     return data_provider().get_random_songs(quantity, score)
 
 @inject
-def get_song(data_provider=DatabaseProvider, quantity=None, score=0.0) -> str:
-    return "404"
-
-@inject
 def create_song(data_provider=DatabaseProvider, song=None):
     return data_provider().create_song(song)
 
@@ -26,5 +22,5 @@ def update_song(data_provider=DatabaseProvider, song=None):
 
 
 @inject
-def delete_song(data_provider=DatabaseProvider, song_id=None):
-    return data_provider().delete_song(song_id)
+def delete_song(data_provider=DatabaseProvider, file_name=None, album_title=None, band=None):
+    return data_provider().delete_song(file_name, album_title, band)

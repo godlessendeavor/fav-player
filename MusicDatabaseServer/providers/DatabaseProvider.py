@@ -55,8 +55,6 @@ class Favorites(BaseModel):
     class Meta:
         table_name = 'favorites'
 
-    #TODO: add to_domain_object
-
 
 def database_mgmt(func):
     """
@@ -203,18 +201,24 @@ class DatabaseProvider(object):
         return self.create_song(song)
 
     @database_mgmt
-    def delete_song(self, song_id):
+    def delete_song(self, file_name=None, album_title=None, band=None):
         """Deletes a song from the favorites table.
         Args:
-            song_id(int): the song id to delete
+            file_name(str): The file name of the song to delete
+            album_title(str): the album of the song to delete
+            band(str): the band of the song to delete
         """
-        fav = Favorites.get(Favorites.id == song_id)
+        albums, res = self.get_album(album_title, band)
+        if res != 200:
+            logger.error(f"Could not find the album {album_title} for band {band} to delete song {file_name}")
+            return None, 404
+        fav = Favorites.get((Favorites.file_name == file_name) & (Favorites.album_id == albums[0]['id']))
         try:
             fav.delete_instance()
         except Exception as ex:
             logger.error('Exception when deleting favorite song: ' + str(ex))
-            return song_id, 400
-        return song_id, 200
+            return file_name, 400
+        return file_name, 200
 
     @database_mgmt
     def get_album(self, album_title, band):

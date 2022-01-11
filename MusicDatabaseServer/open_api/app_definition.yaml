@@ -185,29 +185,6 @@ paths:
                     items:
                       $ref: '#/components/schemas/song'
   /music/song:
-    get:
-      tags:
-        - public
-      summary: Fetch random songs from the songs database
-      operationId: api.songs.get_song
-      parameters:
-        - name: file_name
-          in: query
-          description: File name of the song to search.
-          schema:
-            type: string
-      responses:
-        200:
-          description: Fetch a song from the songs database
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  songs:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/song'
     put:
       tags:
       - public
@@ -250,12 +227,24 @@ paths:
       summary: Deletes a song.
       operationId: api.songs.delete_song
       parameters:
-      - name: song_id
+      - name: file_name
         in: query
-        description: The song id to delete.
+        description: The file name of the song to delete.
         required: true
         schema:
-          type: integer
+          type: string
+      - name: album_title
+        in: query
+        description: The album of the song.
+        required: true
+        schema:
+          type: string
+      - name: band
+        in: query
+        description: The band of the song.
+        required: true
+        schema:
+          type: string
       responses:
         200:
           description: OK
