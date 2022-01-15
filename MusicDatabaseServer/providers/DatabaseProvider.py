@@ -173,7 +173,7 @@ class DatabaseProvider(object):
             fav.track_number = int(song['track_number'])
             fav.type = song['type']
         except KeyError:
-            logger.warning('Type of song was not provided for song: ', song)
+            logger.warning('Type of song or track number was not provided for song: ', song)
 
         try:
             # id was provided so it was already on the database. This will update the existing song
@@ -216,7 +216,7 @@ class DatabaseProvider(object):
         try:
             fav.delete_instance()
         except Exception as ex:
-            logger.error('Exception when deleting favorite song: ' + str(ex))
+            logger.exception(f'Exception when deleting favorite song with file_name {file_name}')
             return file_name, 400
         return file_name, 200
 
@@ -268,27 +268,27 @@ class DatabaseProvider(object):
 
     @database_mgmt
     def create_album(self, album) -> str:
+        """
+        Creates/Updates an album into the database.
+        Args:
+            album(dict): the album dict with fields named as the Album model
+        """
         # load the object and convert to album
-        # TODO: could we use the next line to convert to object with attributes from json dict?
-        # album_entry = json.loads(album, object_hook=lambda d: Namespace(**d))
-
-        album_entry = Album()
+        db_album = Album()
         # first let's check if the album provided already exists
         album_res, result = self.get_album(album_title=album['title'], band=album['band'])
-        print(album_res)
         if result == 200:
-            # TODO: perhaps an update is needed. Copy the album id and continue
-            logger.info(f"Album with title {album['title']} already exists");
-            return album, 200
+            logger.info(f"Album with title {album['title']} already exists. Trying to update")
+            db_album.id = album_res[0]['id']
         elif 'id' in album:
             # if an update is done we will need the id as well
-            album_entry.id = album['id']
+            db_album.id = album['id']
 
         # first copy compulsory fields and validate types
         try:
-            album_entry.band = album['band']
-            album_entry.title = album['title']
-            album_entry.year = int(album['year'])
+            db_album.band = album['band']
+            db_album.title = album['title']
+            db_album.year = int(album['year'])
         except KeyError:
             logger.exception('Exception on key when creating album.')
             return album, 400
@@ -298,36 +298,46 @@ class DatabaseProvider(object):
         # now copy optional fields
         if 'score' in album:
             try:
-                album_entry.score = float(album['score'])
+                db_album.score = float(album['score'])
             except ValueError as ex:
                 logger.warning('Exception on score when creating album %s. %s', album, ex)
         if 'review' in album:
-            album_entry.review = album['review']
+            db_album.review = album['review']
         if 'type' in album:
-            album_entry.type = album['type']
+            db_album.type = album['type']
         if 'country' in album:
-            album_entry.country = album['country']
-            logger.debug(f'Country is {album_entry.country}')
+            db_album.country = album['country']
+            logger.debug(f'Country is {db_album.country}')
         if 'copy' in album:
-            album_entry.copy = album['copy']
+            db_album.copy = album['copy']
         if 'style' in album:
-            album_entry.style = album['style']
+            db_album.style = album['style']
         # save object in database
-        logger.debug(f'Saving album with title {album_entry.title} for band {album_entry.band} in database')
-        if album_entry.save():
-            album['id'] = album_entry.id
+        logger.debug(f'Saving album with title {db_album.title} for band {db_album.band} in database')
+        if db_album.save():
+            album['id'] = db_album.id
             return album, 200
         else:
             # TODO: how to identify a failure from a case where there are no changes
-            logger.error(f'Could not save album {album_entry} in database. Maybe there are no changes')
+            logger.error(f'Could not save album {db_album} in database. Maybe there are no changes')
             return album, 500
 
     @database_mgmt
     def update_album(self, album) -> str:
+        """
+        Updates an album.
+        Args:
+            album(dict): the album dict with fields named as the Album model
+        """
         return self.create_album(album)
 
     @database_mgmt
     def delete_album(self, album_id) -> str:
+        """
+        Deletes an album.
+        Args:
+            album_id(int): the album id
+        """
         album_entry = Album.get(Album.id == album_id)
         try:
             album_entry.delete_instance()
