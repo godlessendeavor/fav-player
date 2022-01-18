@@ -8,28 +8,32 @@ from providers.DatabaseProvider import DatabaseProvider
 
 @inject
 def get_album(data_provider=DatabaseProvider, album_title=None, band=None) -> str:
-    return data_provider().get_album(album_title, band)
+    return data_provider().get_album(album_title=album_title, band=band)
 
 @inject
 def get_album_by_id(data_provider=DatabaseProvider, id=None) -> str:
-    return data_provider().get_album_by_id(id)
+    return data_provider().get_album_by_id(album_id=id)
 
 
 @inject
 def get_random_albums(data_provider=DatabaseProvider, quantity=None) -> str:
-    return data_provider().get_random_albums(quantity)
+    return data_provider().get_random_albums(quantiy=quantity)
 
 
 @inject
 def create_album(data_provider=DatabaseProvider, album=None):
-    return data_provider().create_album(album)
+    return data_provider().create_album(album=album)
 
 
 @inject
 def update_album(data_provider=DatabaseProvider, album=None):
-    return data_provider().update_album(album)
+    return data_provider().update_album(album=album)
 
 
 @inject
-def delete_album(data_provider=DatabaseProvider, album_id=None):
-    return data_provider().delete_album(album_id)
+def delete_album_by_id(data_provider=DatabaseProvider, id=None):
+    return data_provider().delete_album(album_id=id)
+
+@inject
+def delete_album(data_provider=DatabaseProvider, album_title=None, band=None):
+    return data_provider().delete_album(album_title=album_title, band=band)

@@ -221,6 +221,24 @@ class DatabaseProvider(object):
         return file_name, 200
 
     @database_mgmt
+    def delete_song_by_id(self, id=None):
+        import peewee
+        """Deletes a song from the favorites table.
+        Args:
+            id(int): The id of the song to delete
+        """
+        try:
+            fav = Favorites.get(Favorites.id == id)
+        except peewee.DoesNotExist:
+            return id, 404
+        try:
+            fav.delete_instance()
+        except Exception as ex:
+            logger.exception(f'Exception when deleting favorite song with id {id}')
+            return id, 400
+        return id, 200
+
+    @database_mgmt
     def get_album(self, album_title, band):
         """Gets an album by its title and band name
         Args:
@@ -332,7 +350,23 @@ class DatabaseProvider(object):
         return self.create_album(album)
 
     @database_mgmt
-    def delete_album(self, album_id) -> str:
+    def delete_album(self, band=None, album_title=None) -> str:
+        """
+        Deletes an album.
+        Args:
+            album_title(str): the album title
+            band(str): the name of the band
+        """
+        album_entry = Album.get((Album.title == album_title) & (Album.band == band))
+        try:
+            album_entry.delete_instance()
+        except Exception:
+            logger.exception('Exception when deleting album')
+            return album_title, 400
+        return album_title, 200
+
+    @database_mgmt
+    def delete_album_by_id(self, album_id) -> str:
         """
         Deletes an album.
         Args:

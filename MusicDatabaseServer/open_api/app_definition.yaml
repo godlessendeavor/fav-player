@@ -96,18 +96,24 @@ paths:
       summary: Deletes an album.
       operationId: api.albums.delete_album
       parameters:
-        - name: album_id
+        - name: album_title
           in: query
           description: The album id to delete.
           required: true
           schema:
-            type: integer
+            type: string
+        - name: band
+          in: query
+          description: The band of the album to delete.
+          required: true
+          schema:
+            type: string
       responses:
         200:
           description: OK
           content: {}
 
-  /music/album{id}:
+  /music/album/{id}:
     get:
       tags:
         - public
@@ -128,6 +134,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/album'
+    delete:
+      tags:
+        - public
+      summary: Deletes an album.
+      operationId: api.albums.delete_album_by_id
+      parameters:
+        - name: id
+          in: path
+          description: The album id to delete.
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        200:
+          description: OK
+          content: {}
+
 
 
   /music/random_albums:
@@ -245,6 +269,24 @@ paths:
         required: true
         schema:
           type: string
+      responses:
+        200:
+          description: OK
+          content: {}
+  /music/song/{id}:
+    delete:
+      tags:
+      - public
+      summary: Deletes a song.
+      operationId: api.songs.delete_song_by_id
+      parameters:
+      - name: id
+        in: path
+        description: The id of the song to delete.
+        required: true
+        schema:
+          type: integer
+          format: int64
       responses:
         200:
           description: OK

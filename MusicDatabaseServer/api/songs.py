@@ -24,3 +24,7 @@ def update_song(data_provider=DatabaseProvider, song=None):
 @inject
 def delete_song(data_provider=DatabaseProvider, file_name=None, album_title=None, band=None):
     return data_provider().delete_song(file_name, album_title, band)
+
+@inject
+def delete_song_by_id(data_provider=DatabaseProvider, id=None):
+    return data_provider().delete_song_by_id(id)
