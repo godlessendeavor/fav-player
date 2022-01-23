@@ -6,6 +6,12 @@ Created on Oct 22, 2019
 from flask_injector import inject
 from providers.DatabaseProvider import DatabaseProvider
 
+
+@inject
+def get_all_albums(data_provider=DatabaseProvider) -> str:
+    return data_provider().get_all_albums()
+
+
 @inject
 def get_album(data_provider=DatabaseProvider, album_title=None, band=None) -> str:
     return data_provider().get_album(album_title=album_title, band=band)

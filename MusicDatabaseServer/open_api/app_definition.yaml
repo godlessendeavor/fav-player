@@ -113,6 +113,20 @@ paths:
           description: OK
           content: {}
 
+  /music/album/all:
+    get:
+      tags:
+        - public
+      summary: Fetch all albums from the music database
+      operationId: api.albums.get_all_albums
+      responses:
+        200:
+          description: Fetch album(s) from the music database
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/album'
+
   /music/album/{id}:
     get:
       tags:
@@ -151,8 +165,6 @@ paths:
         200:
           description: OK
           content: {}
-
-
 
   /music/random_albums:
     get:
@@ -291,6 +303,31 @@ paths:
         200:
           description: OK
           content: {}
+  /music/song/all:
+    get:
+      tags:
+        - public
+      summary: Fetch all songs from the music database. Paginated by id.
+      operationId: api.songs.get_all_songs
+      parameters:
+      - name: limit
+        in: query
+        description: Number of songs to get. Default is 50. Limit is 100.
+        schema:
+          type: integer
+      - name: after
+        in: query
+        description: id of the song to start retrieving from, for paginated results.
+        schema:
+          type: number
+      responses:
+        200:
+          description: Fetch song(s) from the music database
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/song'
+
 components:
   schemas:
     album:

@@ -8,8 +8,14 @@ from providers.DatabaseProvider import DatabaseProvider
 
 
 @inject
+def get_all_songs(data_provider=DatabaseProvider, limit=50, after=None) -> str:
+    return data_provider().get_all_songs(limit, after)
+
+
+@inject
 def get_random_songs(data_provider=DatabaseProvider, quantity=None, score=0.0) -> str:
     return data_provider().get_random_songs(quantity, score)
+
 
 @inject
 def create_song(data_provider=DatabaseProvider, song=None):
@@ -24,6 +30,7 @@ def update_song(data_provider=DatabaseProvider, song=None):
 @inject
 def delete_song(data_provider=DatabaseProvider, file_name=None, album_title=None, band=None):
     return data_provider().delete_song(file_name, album_title, band)
+
 
 @inject
 def delete_song_by_id(data_provider=DatabaseProvider, id=None):

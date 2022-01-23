@@ -114,6 +114,21 @@ class DatabaseProvider(object):
             return None
         return song
 
+    @database_mgmt
+    def get_all_songs(self, limit=50, after_id=None):
+        """Gets all songs. Limited by limit and after id. Sorted by id"""
+        if after_id:
+            result = Favorites.select().where(Favorites.id > after_id).order_by(Favorites.id).limit(value=limit if limit < 100 else 100)
+        else:
+            result = Favorites.select().order_by(Favorites.id).limit(value=limit if limit < 100 else 100)
+        if result:
+            list_result = [row for row in result.dicts()]
+            logger.debug('Getting result for get_all_songs: %s', list_result)
+            return list_result, 200
+        else:
+            logger.error(f"Could not find any album")
+            return None, 400
+
 
     @database_mgmt
     def get_random_songs(self, quantity=None, score=None):
@@ -237,6 +252,18 @@ class DatabaseProvider(object):
             logger.exception(f'Exception when deleting favorite song with id {id}')
             return id, 400
         return id, 200
+
+    @database_mgmt
+    def get_all_albums(self):
+        """Gets all albums"""
+        result = Album.select()
+        if result:
+            list_result = [row for row in result.dicts()]
+            logger.debug('Getting result for get_all_albums: %s', list_result)
+            return list_result, 200
+        else:
+            logger.error(f"Could not find any album")
+            return None, 400
 
     @database_mgmt
     def get_album(self, album_title, band):
