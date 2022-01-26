@@ -219,7 +219,7 @@ paths:
                   songs:
                     type: array
                     items:
-                      $ref: '#/components/schemas/song'
+                      $ref: '#/components/schemas/fav'
   /music/song:
     put:
       tags:
@@ -326,7 +326,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/song'
+                type: object
+                properties:
+                  songs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/song'
 
 components:
   schemas:
@@ -359,7 +364,7 @@ components:
           type: string
         copy:
           type: string
-    song:
+    fav:
       type: object
       properties:
         id:
@@ -381,7 +386,32 @@ components:
         type:
           type: string
         album:
-          $ref: '#/components/schemas/album'
+          $ref: '#/components/schemas/album'   # fav includes full album object
+    song:
+      type: object
+      properties:
+        id:
+          oneOf:
+            - type: string
+            - type: integer
+        title:
+          type: string
+        file_name:
+          type: string
+        track_number:
+          oneOf:
+            - type: string
+            - type: integer
+        score:
+          oneOf:
+            - type: string
+            - type: number
+        type:
+          type: string
+        album_id:      # song only includes a reference to an album
+          oneOf:
+            - type: string
+            - type: integer
 #  securitySchemes:
 #    oauth2:
 #      type: oauth2
