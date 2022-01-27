@@ -189,6 +189,22 @@ paths:
                 items:
                   $ref: '#/components/schemas/album'
 
+  /music/band/all:
+    get:
+      tags:
+      - public
+      summary: Fetch all bands from the music database
+      operationId: api.bands.get_all_bands
+      responses:
+        200:
+          description: Fetch all bands from the music database
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+
   /music/fav_songs:
     get:
       tags:

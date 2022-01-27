@@ -4,6 +4,6 @@ connexion[swagger-ui]
 Flask-Injector
 injector==0.17.0
 pymysql
-peewee
+peewee==3.14.8
 Flask-Cors==3.0.10
 cryptography==36.0.1

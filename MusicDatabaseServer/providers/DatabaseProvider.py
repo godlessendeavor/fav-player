@@ -117,6 +117,9 @@ class DatabaseProvider(object):
     @database_mgmt
     def get_all_songs(self, limit=50, after_id=None):
         """Gets all songs. Limited by limit and after id. Sorted by id"""
+    #TODO: do pagination this way instead
+    #https: // docs.peewee - orm.com / en / latest / peewee / querying.html  # paginating-records
+    #for tweet in Tweet.select().order_by(Tweet.id).paginate(2, 10):
         if after_id:
             result = Favorites.select().where(Favorites.id > after_id).order_by(Favorites.id).limit(value=limit if limit < 100 else 100)
         else:
@@ -128,7 +131,6 @@ class DatabaseProvider(object):
         else:
             logger.error(f"Could not find any album")
             return None, 400
-
 
     @database_mgmt
     def get_random_songs(self, quantity=None, score=None):
@@ -312,7 +314,7 @@ class DatabaseProvider(object):
             return quantity, 400
 
     @database_mgmt
-    def create_album(self, album) -> str:
+    def create_album(self, album):
         """
         Creates/Updates an album into the database.
         Args:
@@ -368,7 +370,7 @@ class DatabaseProvider(object):
             return album, 500
 
     @database_mgmt
-    def update_album(self, album) -> str:
+    def update_album(self, album):
         """
         Updates an album.
         Args:
@@ -377,7 +379,7 @@ class DatabaseProvider(object):
         return self.create_album(album)
 
     @database_mgmt
-    def delete_album(self, band=None, album_title=None) -> str:
+    def delete_album(self, band=None, album_title=None):
         """
         Deletes an album.
         Args:
@@ -393,7 +395,7 @@ class DatabaseProvider(object):
         return album_title, 200
 
     @database_mgmt
-    def delete_album_by_id(self, album_id) -> str:
+    def delete_album_by_id(self, album_id):
         """
         Deletes an album.
         Args:
@@ -406,6 +408,18 @@ class DatabaseProvider(object):
             logger.exception('Exception when deleting album')
             return album_id, 400
         return album_id, 200
+
+    @database_mgmt
+    def get_all_bands(self):
+        """Gets all bands"""
+        result = Album.select(fn.Distinct(Album.band))
+        if result:
+            list_result = [row['band'] if 'band' in row else None for row in result.dicts()]
+            logger.debug('Getting result for get_all_bands: %s', list_result)
+            return list_result, 200
+        else:
+            logger.error(f"Could not find any band")
+            return None, 404
 
     # TODO: implement this in a different way or add behavior (like checking connection to database)
     def get(self):
