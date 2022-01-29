@@ -267,6 +267,39 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/fav'
+
+  /music/recent_songs:
+    get:
+      tags:
+        - public
+      summary: Fetch recent songs from the songs database
+      operationId: api.songs.get_recent_songs
+      parameters:
+        - name: quantity
+          required: True
+          in: query
+          description: Number of songs to get.
+          schema:
+            type: integer
+        - name: score
+          in: query
+          description: Minimum score of the favorite songs to get. If not indicated
+            it will return all songs.
+          schema:
+            type: number
+      responses:
+        200:
+          description: Fetch random songs from the songs database
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  songs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/fav'
+
   /music/song:
     put:
       tags:

@@ -18,6 +18,11 @@ def get_random_songs(data_provider=DatabaseProvider, quantity=None, score=0.0) -
 
 
 @inject
+def get_recent_songs(data_provider=DatabaseProvider, quantity=None, score=0.0) -> str:
+    return data_provider().get_recent_songs(quantity, score)
+
+
+@inject
 def create_song(data_provider=DatabaseProvider, song=None):
     return data_provider().create_song(song)
 

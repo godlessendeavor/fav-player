@@ -160,7 +160,31 @@ class DatabaseProvider(object):
         # corresponding model. A bit too much effort and not clean. I'm not worried about efficiency here
         list_result = [song for song in result.dicts() if self._get_album_for_song(song)]
         logger.debug('Getting result for get_songs: %s', list_result)
-        return {'songs': list_result}
+        return {'songs': list_result}, 200
+
+    @database_mgmt
+    def get_recent_songs(self, quantity=None, score=None):
+        """Get songs from the favorites table by quantity and score
+        Args:
+            quantity(int): limit of songs to retrieve
+            score(float): minimum score of songs to retrieve (Values are from 0 to 10, but no validation is done here)
+        Returns:
+            dict: with 'songs' as key and the song list as value
+        """
+        # get result from database as Peewee model
+        if quantity and score:
+            result = Favorites.select() \
+                .where(Favorites.score > score) \
+                .order_by(Favorites.id.desc()).limit(int(quantity))
+        elif quantity:
+            result = Favorites.select() \
+                .order_by(Favorites.id.desc()).limit(int(quantity))
+        else:
+            return {}, 400
+        # same comment as in get_random_songs, no JOIN performed here
+        list_result = [song for song in result.dicts() if self._get_album_for_song(song)]
+        logger.debug('Getting result for get_songs: %s', list_result)
+        return {'songs': list_result}, 200
 
     @database_mgmt
     def create_song(self, song):
