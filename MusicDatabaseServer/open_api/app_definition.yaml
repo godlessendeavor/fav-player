@@ -125,7 +125,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/album'
+                type: object
+                properties:
+                  songs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/album'
 
   /music/album/{id}:
     get:
@@ -165,6 +170,32 @@ paths:
         200:
           description: OK
           content: {}
+
+  /music/band/{name}/albums:
+    get:
+      tags:
+        - public
+      summary: Fetch all albums of a band
+      operationId: api.bands.get_all_albums_from_band
+      parameters:
+        - name: name
+          in: path
+          description: Band name
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Fetch all album(s) of a band from the music database
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  songs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/album'
 
   /music/random_albums:
     get:

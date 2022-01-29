@@ -258,6 +258,7 @@ class DatabaseProvider(object):
     @database_mgmt
     def get_all_albums(self):
         """Gets all albums"""
+        #TODO: do pagination here
         result = Album.select()
         if result:
             list_result = [row for row in result.dicts()]
@@ -419,6 +420,21 @@ class DatabaseProvider(object):
             return list_result, 200
         else:
             logger.error(f"Could not find any band")
+            return None, 404
+
+    @database_mgmt
+    def get_all_albums_from_band(self, band):
+        """Gets all albums from band
+        Args:
+            band: the band to search the albums for.
+        """
+        result = Album.select().where(Album.band == band)
+        if result:
+            list_result = [row for row in result.dicts()]
+            logger.debug('Getting result for get_all_albums_from_band: %s', list_result)
+            return list_result, 200
+        else:
+            logger.error(f"Could not find any band with name {band}")
             return None, 404
 
     # TODO: implement this in a different way or add behavior (like checking connection to database)
