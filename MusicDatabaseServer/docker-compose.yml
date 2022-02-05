@@ -23,7 +23,7 @@ services:
       - ${MUSIC_DB_ENV_FILE}
     image: godlessendeavor/musicdbserver
     ports:
-      - ${APP_PORT}:${APP_PORT}
+      - ${MUSICDB_PORT}:${MUSICDB_PORT}
     depends_on:
       - musicdb
     #volume bound to path in the host. Use :Z to share this volume (And preventing SELinux to complain about permissions)

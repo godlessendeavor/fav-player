@@ -14,7 +14,7 @@ The following env vars need to be defined
   DATABASE_PORT: port to connect to the database 
   DATABASE_USER: username of the database
   ACCESS_TOKEN: access token to connect to the database admin
-  APP_PORT: port to connect to the APP
+  MUSICDB_PORT: port to connect to the APP
 ```
 
 Deployment
@@ -62,7 +62,7 @@ data:
   DATABASE_PORT: "3306"
   DATABASE_USER: "admin"
   ACCESS_TOKEN: "666"
-  APP_PORT: 2020
+  MUSICDB_PORT: 2020
 ```
 
 Development

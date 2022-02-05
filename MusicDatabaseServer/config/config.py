@@ -30,6 +30,6 @@ DATABASE_PASSWORD = os.environ.get('DATABASE_PASSWORD')
 
 ACCESS_TOKEN      = os.environ.get('ACCESS_TOKEN')
 
-SERVER_PORT = int(os.environ.get('APP_PORT'))
+SERVER_PORT = int(os.environ.get('MUSICDB_PORT'))
 
 LOGGING_LEVEL = appconf['logging']['LOGGING_LEVEL']
