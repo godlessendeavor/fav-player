@@ -289,8 +289,8 @@ class DatabaseProvider(object):
             logger.debug('Getting result for get_all_albums: %s', list_result)
             return list_result, 200
         else:
-            logger.error(f"Could not find any album")
-            return None, 400
+            logger.warning(f"Could not find any album")
+            return [], 200
 
     @database_mgmt
     def get_album(self, album_title, band):
@@ -306,7 +306,7 @@ class DatabaseProvider(object):
             return list_result, 200
         else:
             logger.error(f"Could not find album with title {album_title} for band {band}")
-            return album_title, 400
+            return album_title, 404
 
     @database_mgmt
     def get_album_by_id(self, album_id):
@@ -321,7 +321,7 @@ class DatabaseProvider(object):
             return list_result, 200
         else:
             logger.error(f"Could not find album with id {album_id}")
-            return album_id, 400
+            return album_id, 404
 
     @database_mgmt
     def get_random_albums(self, quantity):
@@ -335,8 +335,8 @@ class DatabaseProvider(object):
             logger.debug('Getting result for get_random_album: %s', list_result)
             return list_result, 200
         else:
-            logger.error(f"Could not find random albums")
-            return quantity, 400
+            logger.warning(f"Could not find any albums")
+            return [], 200
 
     @database_mgmt
     def create_album(self, album):
@@ -363,10 +363,10 @@ class DatabaseProvider(object):
             db_album.year = int(album['year'])
         except KeyError:
             logger.exception('Exception on key when creating album.')
-            return album, 400
+            return album, 500
         except ValueError:
             logger.exception('Exception on value when creating album.')
-            return album, 400
+            return album, 500
         # now copy optional fields
         if 'score' in album:
             try:
@@ -390,9 +390,8 @@ class DatabaseProvider(object):
             album['id'] = db_album.id
             return album, 200
         else:
-            # TODO: how to identify a failure from a case where there are no changes
-            logger.error(f'Could not save album {db_album} in database. Maybe there are no changes')
-            return album, 500
+            logger.warning(f'Album {db_album} was not saved in database. Maybe there are no changes')
+            return album, 200
 
     @database_mgmt
     def update_album(self, album):
@@ -416,7 +415,7 @@ class DatabaseProvider(object):
             album_entry.delete_instance()
         except Exception:
             logger.exception('Exception when deleting album')
-            return album_title, 400
+            return album_title, 500
         return album_title, 200
 
     @database_mgmt
@@ -431,7 +430,7 @@ class DatabaseProvider(object):
             album_entry.delete_instance()
         except Exception:
             logger.exception('Exception when deleting album')
-            return album_id, 400
+            return album_id, 500
         return album_id, 200
 
     @database_mgmt
@@ -443,8 +442,8 @@ class DatabaseProvider(object):
             logger.debug('Getting result for get_all_bands: %s', list_result)
             return list_result, 200
         else:
-            logger.error(f"Could not find any band")
-            return None, 404
+            logger.warning(f"Could not find any band")
+            return [], 200
 
     @database_mgmt
     def get_all_albums_from_band(self, band):
@@ -459,7 +458,7 @@ class DatabaseProvider(object):
             return list_result, 200
         else:
             logger.error(f"Could not find any band with name {band}")
-            return None, 404
+            return [], 404
 
     # TODO: implement this in a different way or add behavior (like checking connection to database)
     def get(self):
