@@ -298,7 +298,7 @@ paths:
                   songs:
                     type: array
                     items:
-                      $ref: '#/components/schemas/fav'
+                      $ref: '#/components/schemas/enriched_song'
 
   /music/song:
     put:
@@ -444,7 +444,7 @@ components:
           type: string
         copy:
           type: string
-    fav:
+    enriched_song:
       type: object
       properties:
         id:
