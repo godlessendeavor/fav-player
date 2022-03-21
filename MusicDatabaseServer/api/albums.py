@@ -38,7 +38,7 @@ def update_album(data_provider=DatabaseProvider, album=None):
 
 @inject
 def delete_album_by_id(data_provider=DatabaseProvider, id=None):
-    return data_provider().delete_album(album_id=id)
+    return data_provider().delete_album_by_id(album_id=id)
 
 @inject
 def delete_album(data_provider=DatabaseProvider, album_title=None, band=None):
