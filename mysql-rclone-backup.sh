@@ -22,19 +22,19 @@ then
     ##create directory
     mkdir $DIRPATH$DIRNAME
     ##dump mysql database on server
-    docker exec $CONTAINER /usr/bin/mysqldump -u $DBUSER -p$DBPASS $DATABASEe | gzip>"$DIRPATH$DIRNAME/$DATABASEe($(date +\%Y_\%m_\%d_\%H)).sql.gz"
+    docker exec $CONTAINER /usr/bin/mysqldump -u $DBUSER -p$DBPASS $DATABASEe | gzip>"$DIRPATH$DIRNAME/$DATABASE($(date +\%Y-\%m-\%d-\%H)).sql.gz"
     ##wait for 10 seconds
     sleep 10
     ##upload it to google drive
-    rclone copy "$DIRPATH$DIRNAME/$DATABASEe($(date +\%Y_\%m_\%d_\%H)).sql.gz" $RCLONE_REMOTE_NAME:$GDRIVE_FOLDER_NAME
+    rclone --config=/home/ubuntu/.config/rclone/rclone.conf copy "$DIRPATH$DIRNAME/$DATABASE($(date +\%Y-\%m-\%d-\%H)).sql.gz" $RCLONE_REMOTE_NAME:$GDRIVE_FOLDER_NAME
 ##if folder already exist
 else
     ##dump mysql database on server
-    docker exec $CONTAINER /usr/bin/mysqldump -u $DBUSER -p$DBPASS $DATABASEe | gzip>"$DIRPATH$DIRNAME/$DATABASEe($(date +\%Y-\%m-\%d-\%H)).sql.gz"
+    docker exec $CONTAINER /usr/bin/mysqldump -u $DBUSER -p$DBPASS $DATABASEe | gzip>"$DIRPATH$DIRNAME/$DATABASE($(date +\%Y-\%m-\%d-\%H)).sql.gz"
      ##wait for 10 seconds
     sleep 10
     ##upload it to google drive
-    rclone copy "$DIRPATH$DIRNAME/$DATABASEe($(date +\%Y-\%m-\%d-\%H)).sql.gz" $RCLONE_REMOTE_NAME:$GDRIVE_FOLDER_NAME
+    rclone --config=/home/ubuntu/.config/rclone/rclone.conf copy "$DIRPATH$DIRNAME/$DATABASE($(date +\%Y-\%m-\%d-\%H)).sql.gz" $RCLONE_REMOTE_NAME:$GDRIVE_FOLDER_NAME
     ##delete 10 days older file on server to save disk space
     find $DIRPATH$DIRNAME -mtime +10 -type f -delete
 fi
