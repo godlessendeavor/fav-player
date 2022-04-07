@@ -266,7 +266,7 @@ paths:
                   songs:
                     type: array
                     items:
-                      $ref: '#/components/schemas/fav'
+                      $ref: '#/components/schemas/enriched_song'
 
   /music/recent_songs:
     get:
